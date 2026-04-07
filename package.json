@@ -1,0 +1,14 @@
+{
+  "name": "example-x402",
+  "private": true,
+  "scripts": {
+    "dev:worker": "pnpm --filter @example-x402/worker dev",
+    "deploy:worker": "pnpm --filter @example-x402/worker deploy",
+    "agent": "pnpm --filter @example-x402/agent start",
+    "check-balance": "tsx scripts/check-balance.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
