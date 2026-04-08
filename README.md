@@ -332,19 +332,6 @@ is extracted from the BBS+ selective disclosure envelope — cryptographic data
 | `words` | number | Word count, content depth indicator |
 | `lang` | string (ISO 639-1) | Language for relevance filtering |
 
-## Disclosure Gating
-
-The `disclosure` field in the query opts-in to receiving BBS+ selective disclosures.
-Documents registered without a `condition` return disclosures freely (payment is
-the only gate). To add ZK-proof-based access control on top:
-
-```json
-{ "disclosure": { "...", "condition": { "circuitId": "your-circuit-id" } } }
-```
-
-See [lemmaoracle/workers#24](https://github.com/lemmaoracle/workers/pull/24)
-for the `disclosure.condition` implementation.
-
 ## Network
 
 Monad testnet (chainId `10143`) — fast, EVM-compatible, ideal for micropayment demos.
