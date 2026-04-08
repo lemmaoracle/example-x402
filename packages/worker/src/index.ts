@@ -120,6 +120,13 @@ const app = new Hono<{ Bindings: Env }>();
 // Gate POST /query: $0.001 USDC per request on Monad testnet.
 // Uses self-verify mode (@x402/evm) — the Monad network is not supported
 // by the x402 public facilitator, so the worker verifies payments itself.
+//
+// The `extra.lemmaAttestation` field surfaces ZK-verifiable quality hints
+// inside the 402 PAYMENT-REQUIRED header so AI agents can make informed
+// purchasing decisions *before* paying.  After payment, the corresponding
+// attributes are returned with full ZK proof backing.
+//
+// See: https://www.perplexity.ai/page/lemma-nitotutenoshi-suo-.KJBBLmAS7m0vmEmAtP.pw
 // ---------------------------------------------------------------------------
 app.use(
   "/query",
@@ -130,6 +137,27 @@ app.use(
         "POST /query": {
           price: "$0.001",
           network: "monad-testnet" as Network,
+          description:
+            "ZK-verified blog articles with BBS+ selective disclosure",
+          extra: {
+            lemmaAttestation: {
+              circuitId: "blog-article-v1",
+              schema: "blog-article",
+              // Quality hints — visible before payment, verifiable after.
+              // "See but can't trust → pay → verify with ZK proof."
+              hints: {
+                attributes: ["author", "published", "words", "lang", "integrity"],
+                authors: [
+                  "did:example:alice",
+                  "did:example:bob",
+                  "did:example:charlie",
+                ],
+                freshness: "2026-04-08",
+                langs: ["en", "ja"],
+                count: 3,
+              },
+            },
+          },
         },
       },
       {

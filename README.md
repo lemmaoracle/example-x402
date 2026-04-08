@@ -1,12 +1,23 @@
 # example-x402
 
-**Pay-per-query ZK attribute API in 5 minutes** — Lemma × [x402](https://x402.org) on Monad testnet.
+**Pay-per-query ZK-verified blog articles in 5 minutes** — [Lemma](https://lemmaoracle.com) × [x402](https://x402.org) on Monad testnet.
 
-An AI agent pays a Cloudflare Worker micro-fee per query. The worker forwards the request to the
-Lemma API, returning ZK-verified attributes only after payment clears.
+An AI agent pays a Cloudflare Worker a micro-fee per query. The worker forwards
+the request to the Lemma API, returning ZK-verified attributes and BBS+ selective
+disclosures (title, body) only after payment clears.
+
+> This demo uses blog articles as the example, but Lemma works with any verifiable
+> data — research reports, credentials, IoT sensor readings, financial attestations, etc.
 
 ```
-Agent ──[x402 $0.001 USDC]──▶ Worker ──[Lemma query]──▶ ZK attributes
+                         402 PAYMENT-REQUIRED
+                  ┌─── { extra.lemmaAttestation.hints } ───┐
+                  │   "3 articles, en/ja, Alice/Bob/Charlie" │
+                  │   AI decides: worth $0.001?              │
+                  └──────────────────────────────────────────┘
+                              │ yes → auto-pay
+                              ▼
+Agent ──[$0.001 USDC]──▶ Worker ──[Lemma query]──▶ ZK attributes + disclosed content
 ```
 
 ## Prerequisites
@@ -51,38 +62,115 @@ Update `WORKER_URL` in `.env` with the deployed URL.
 
 ```bash
 pnpm agent
-# Agent queries the worker, auto-pays via x402, prints ZK attributes
+# Agent queries the worker, auto-pays via x402, prints ZK-verified articles
 ```
 
 ## Project Structure
 
 ```
 packages/
-  worker/   Cloudflare Worker — Hono + x402-hono middleware
-  agent/    Node.js agent — @x402/fetch auto-payment
+  worker/      Cloudflare Worker — Hono + x402-hono, payment gating + disclosure extraction
+  agent/       Node.js agent — @x402/fetch auto-payment
+  circuit/     Circom circuit — blog-article-v1 (Poseidon commitment opening)
+  normalize/   rowDoc → normDoc conversion (TypeScript, WASM-compilable)
+  generator/   Cloudflare Worker — blog article registration with Lemma
 scripts/
   check-balance.ts   Check agent wallet USDC balance on Monad testnet
 ```
 
 ## How It Works
 
-1. **Agent** calls `GET /query` on the worker using `@x402/fetch`
-2. Worker returns `402 Payment Required` with payment details
-3. `@x402/fetch` automatically signs and broadcasts a USDC payment on Monad testnet
-4. Worker verifies payment via `@x402/evm` (self-verify mode — Monad not supported by public facilitator)
-5. Worker queries Lemma with `disclosure: { proof: "", inputs: [] }` opt-in
-6. ZK-verified attributes returned to the agent
+### Phase 1: Pre-payment (402 hints)
+
+When the agent hits `POST /query` without payment, the worker returns `402 Payment Required`
+with quality hints in the `extra.lemmaAttestation` field:
+
+```json
+{
+  "lemmaAttestation": {
+    "circuitId": "blog-article-v1",
+    "schema": "blog-article",
+    "hints": {
+      "attributes": ["author", "published", "words", "lang", "integrity"],
+      "authors": ["did:example:alice", "did:example:bob"],
+      "freshness": "2026-04-08",
+      "langs": ["en", "ja"],
+      "count": 3
+    }
+  }
+}
+```
+
+These hints are visible but unverified. The AI agent uses them to decide whether
+the content is worth paying for.
+
+### Phase 2: Post-payment (ZK-verified response)
+
+After `@x402/fetch` auto-pays, the worker queries Lemma and returns a simplified response:
+
+```json
+{
+  "results": [{
+    "docHash": "0x...",
+    "schema": "blog-article",
+    "attributes": {
+      "author": "did:example:alice",
+      "published": 1712534400,
+      "words": 1500,
+      "lang": "en",
+      "integrity": "1234..."
+    },
+    "disclosed": {
+      "title": "ZK Proofs Explained",
+      "body": "Zero-knowledge proofs allow one party to prove..."
+    },
+    "proof": { "status": "verified", "circuitId": "blog-article-v1" }
+  }],
+  "hasMore": false
+}
+```
+
+The `attributes` are ZK-verified and match the 402 hints. The `disclosed` content
+is extracted from the BBS+ selective disclosure envelope — cryptographic data
+(proof, publicKey, indexes) is stripped for cleanliness.
+
+## Attribute Schema
+
+| Attribute | Type | Description |
+|---|---|---|
+| `author` | string (DID) | Provable authorship identity |
+| `published` | number (unix sec) | Publication timestamp for freshness |
+| `integrity` | string (Poseidon hash) | Body content hash, tamper detection |
+| `words` | number | Word count, content depth indicator |
+| `lang` | string (ISO 639-1) | Language for relevance filtering |
+
+## Circuit: `blog-article-v1`
+
+A Poseidon commitment-opening circuit with 5 private inputs (the attributes above)
+and 1 public input (the commitment hash). Proves knowledge of attribute values
+without revealing them on-chain.
+
+Future extensions: range proofs on `published` (enforce freshness), membership
+proofs on `author` (trusted author allowlists), minimum `words` thresholds.
+
+## Pre-deployed Artifacts
+
+The `circuit`, `normalize`, and `generator` packages are pre-deployed by Lemma
+for this demo. If the example works as-is, no redeployment is needed. Modify and
+redeploy only if you want to customize the attribute schema or circuit.
 
 ## Disclosure Gating
 
-The `disclosure` field opts-in to receiving BBS+ selective disclosures. Documents registered
-without a `condition` return disclosures freely (payment at the worker level is the only gate).
+The `disclosure` field in the query opts-in to receiving BBS+ selective disclosures.
+Documents registered without a `condition` return disclosures freely (payment is
+the only gate). To add ZK-proof-based access control on top:
 
-To add ZK-proof-based access control on top, register the document with:
 ```json
-{ "disclosure": { ..., "condition": { "circuitId": "your-circuit-id" } } }
+{ "disclosure": { "...", "condition": { "circuitId": "your-circuit-id" } } }
 ```
-Then supply a valid proof in `disclosure.proof` / `disclosure.inputs`.
+
+See [lemmaoracle/workers PR #24](https://github.com/lemmaoracle/workers/pull/24)
+for the `disclosure.condition` implementation.
 
 ## Network
 

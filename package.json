@@ -4,6 +4,9 @@
   "scripts": {
     "dev:worker": "pnpm --filter @example-x402/worker dev",
     "deploy:worker": "pnpm --filter @example-x402/worker deploy",
+    "dev:generator": "pnpm --filter @example-x402/generator dev",
+    "deploy:generator": "pnpm --filter @example-x402/generator deploy",
+    "seed": "pnpm --filter @example-x402/generator seed",
     "agent": "pnpm --filter @example-x402/agent start",
     "check-balance": "tsx scripts/check-balance.ts"
   },
