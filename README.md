@@ -48,7 +48,6 @@ cp .env.example .env
 ### 3. Deploy the worker
 
 ```bash
-# Set secrets in Cloudflare (do not commit .env)
 wrangler secret put PAY_TO_ADDRESS --cwd packages/worker
 wrangler secret put LEMMA_API_BASE --cwd packages/worker
 
@@ -65,15 +64,212 @@ pnpm agent
 # Agent queries the worker, auto-pays via x402, prints ZK-verified articles
 ```
 
+---
+
+## Integrate with Your Blog
+
+This section explains how to register your own blog articles with Lemma
+so they appear in query results behind the x402 paywall.
+
+The registration pipeline runs in your existing tooling — GitHub Actions,
+WordPress hooks, Astro build scripts, a CLI, etc. There is no separate
+service to deploy.
+
+### Step 1: Generate a BBS+ key pair (one-time)
+
+```ts
+import { disclose } from "@lemmaoracle/lemma";
+
+const { secretKey, publicKey } = await disclose.generateKeyPair();
+// Store secretKey securely (env var, secret manager, etc.)
+// publicKey is shared with Lemma during issuer registration
+console.log("publicKey:", Buffer.from(publicKey).toString("hex"));
+```
+
+Save `secretKey` as a CI secret (`LEMMA_BBS_SECRET_KEY`).
+You will not need to regenerate this unless you rotate keys.
+
+### Step 2: Normalize the article
+
+The normalize WASM converts your raw article into circuit-ready attributes.
+Use the pre-built WASM from `packages/normalize`:
+
+```ts
+import init, { normalize } from "@example-x402/normalize/pkg/normalize.js";
+
+await init();
+
+const normJson = normalize(JSON.stringify({
+  title:       "My Blog Post",
+  author:      "did:example:you",
+  body:        "Full article body text...",
+  publishedAt: "2026-04-08T12:00:00Z",
+  lang:        "en",
+}));
+
+const norm = JSON.parse(normJson);
+// norm = { author, published, integrity, words, lang }
+```
+
+If your environment cannot run WASM (e.g. edge functions without WASM support),
+call the equivalent logic directly — the normalize output is:
+
+| Field | Derivation |
+|---|---|
+| `author` | pass-through |
+| `published` | ISO 8601 → unix seconds |
+| `integrity` | SHA-256 hex of `body` |
+| `words` | whitespace word count |
+| `lang` | pass-through |
+
+### Step 3: Sign and create selective disclosure
+
+```ts
+import { disclose } from "@lemmaoracle/lemma";
+import type { LemmaClient } from "@lemmaoracle/spec";
+
+const client: LemmaClient = { apiBase: "https://api.lemmaoracle.com" };
+const header = new TextEncoder().encode("blog-article-v1");
+
+// All attributes as a flat object — keys are sorted deterministically
+// by payloadToMessages into "key:value" strings for BBS+ signing.
+const payload = {
+  author:    norm.author,
+  body:      article.body,       // full body goes into BBS+ message vector
+  integrity: norm.integrity,
+  lang:      norm.lang,
+  published: String(norm.published),
+  title:     article.title,      // full title goes into BBS+ message vector
+  words:     String(norm.words),
+};
+
+// Sign all attributes
+const messages = disclose.payloadToMessages(payload);
+const signed = await disclose.sign(client, {
+  messages,
+  secretKey,   // from Step 1
+  header,
+  issuerId: "did:example:you",
+});
+
+// Selective disclosure: reveal title + body (hide everything else)
+// Indexes correspond to the sorted key order of payload.
+// Sorted keys: author, body, integrity, lang, published, title, words
+//              0       1     2          3     4          5      6
+const TITLE_IDX = 5;
+const BODY_IDX  = 1;
+
+const revealed = await disclose.reveal(client, {
+  signature: signed.signature,
+  messages:  signed.messages,
+  publicKey: signed.publicKey,
+  indexes:   [BODY_IDX, TITLE_IDX],
+  header,
+});
+
+const sd = disclose.toSelectiveDisclosure(revealed, {
+  publicKey: signed.publicKey,
+  header,
+  count: messages.length,
+});
+// sd is a SelectiveDisclosure object ready for Lemma submission
+```
+
+### Step 4: Register with Lemma
+
+```ts
+const LEMMA_API = "https://api.lemmaoracle.com";
+const docHash = `0x${norm.integrity}`;  // SHA-256 of body as doc identifier
+
+// 4a. Register the document
+await fetch(`${LEMMA_API}/documents/register`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    docHash,
+    schemaId:  "blog-article",
+    issuerId:  "did:example:you",
+    subjectId: "did:example:you",
+    attributes: [
+      { name: "author",    value: norm.author,    type: "string" },
+      { name: "published", value: norm.published,  type: "number" },
+      { name: "integrity", value: norm.integrity,  type: "string" },
+      { name: "words",     value: norm.words,       type: "number" },
+      { name: "lang",      value: norm.lang,        type: "string" },
+    ],
+  }),
+});
+
+// 4b. Submit proof with selective disclosure
+await fetch(`${LEMMA_API}/proofs/submit`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    docHash,
+    circuitId: "blog-article-v1",
+    proof:     "",  // placeholder — production: snarkjs.groth16.fullProve output
+    inputs:    [norm.author, String(norm.published), norm.integrity, String(norm.words), norm.lang],
+    disclosure: sd,
+  }),
+});
+```
+
+### Example: GitHub Action
+
+```yaml
+# .github/workflows/register-articles.yml
+name: Register articles with Lemma
+on:
+  push:
+    paths: ["content/**"]
+
+jobs:
+  register:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install
+
+      - name: Register new/changed articles
+        env:
+          LEMMA_BBS_SECRET_KEY: ${{ secrets.LEMMA_BBS_SECRET_KEY }}
+          LEMMA_API_BASE: https://api.lemmaoracle.com
+        run: |
+          # Your script that:
+          # 1. Finds changed .md files in content/
+          # 2. Parses frontmatter (title, author, lang, date)
+          # 3. Runs Steps 2–4 above for each article
+          pnpm tsx scripts/register.ts
+```
+
+### Example: WordPress hook (conceptual)
+
+```php
+add_action('publish_post', function($post_id) {
+    $post = get_post($post_id);
+    // Call a Node.js sidecar or serverless function
+    // that runs Steps 2–4 with the post content
+    wp_remote_post('https://your-lambda.example.com/register', [
+        'body' => json_encode([
+            'title' => $post->post_title,
+            'body'  => wp_strip_all_tags($post->post_content),
+            'lang'  => get_locale(),
+        ]),
+    ]);
+});
+```
+
+---
+
 ## Project Structure
 
 ```
 packages/
   worker/      Cloudflare Worker — Hono + x402-hono, payment gating + disclosure extraction
   agent/       Node.js agent — @x402/fetch auto-payment
-  circuit/     Circom circuit — blog-article-v1 (Poseidon commitment opening)
-  normalize/   rowDoc → normDoc conversion (TypeScript, WASM-compilable)
-  generator/   Cloudflare Worker — blog article registration with Lemma
+  circuit/     Circom circuit — blog-article-v1 (Poseidon commitment, pre-deployed by Lemma)
+  normalize/   Rust WASM — rowDoc → normDoc conversion (pre-deployed by Lemma)
 scripts/
   check-balance.ts   Check agent wallet USDC balance on Monad testnet
 ```
@@ -83,7 +279,7 @@ scripts/
 ### Phase 1: Pre-payment (402 hints)
 
 When the agent hits `POST /query` without payment, the worker returns `402 Payment Required`
-with quality hints in the `extra.lemmaAttestation` field:
+with quality hints in `extra.lemmaAttestation`:
 
 ```json
 {
@@ -115,10 +311,10 @@ After `@x402/fetch` auto-pays, the worker queries Lemma and returns a simplified
     "schema": "blog-article",
     "attributes": {
       "author": "did:example:alice",
-      "published": 1712534400,
+      "published": 1775001600,
       "words": 1500,
       "lang": "en",
-      "integrity": "1234..."
+      "integrity": "ab12..."
     },
     "disclosed": {
       "title": "ZK Proofs Explained",
@@ -140,24 +336,9 @@ is extracted from the BBS+ selective disclosure envelope — cryptographic data
 |---|---|---|
 | `author` | string (DID) | Provable authorship identity |
 | `published` | number (unix sec) | Publication timestamp for freshness |
-| `integrity` | string (Poseidon hash) | Body content hash, tamper detection |
+| `integrity` | string (SHA-256 hex) | Body content hash, tamper detection |
 | `words` | number | Word count, content depth indicator |
 | `lang` | string (ISO 639-1) | Language for relevance filtering |
-
-## Circuit: `blog-article-v1`
-
-A Poseidon commitment-opening circuit with 5 private inputs (the attributes above)
-and 1 public input (the commitment hash). Proves knowledge of attribute values
-without revealing them on-chain.
-
-Future extensions: range proofs on `published` (enforce freshness), membership
-proofs on `author` (trusted author allowlists), minimum `words` thresholds.
-
-## Pre-deployed Artifacts
-
-The `circuit`, `normalize`, and `generator` packages are pre-deployed by Lemma
-for this demo. If the example works as-is, no redeployment is needed. Modify and
-redeploy only if you want to customize the attribute schema or circuit.
 
 ## Disclosure Gating
 
@@ -169,7 +350,7 @@ the only gate). To add ZK-proof-based access control on top:
 { "disclosure": { "...", "condition": { "circuitId": "your-circuit-id" } } }
 ```
 
-See [lemmaoracle/workers PR #24](https://github.com/lemmaoracle/workers/pull/24)
+See [lemmaoracle/workers#24](https://github.com/lemmaoracle/workers/pull/24)
 for the `disclosure.condition` implementation.
 
 ## Network
