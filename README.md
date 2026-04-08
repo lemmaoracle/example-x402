@@ -78,7 +78,7 @@ service to deploy.
 ### Step 1: Generate a BBS+ key pair (one-time)
 
 ```ts
-import { disclose } from "@lemmaoracle/lemma";
+import { disclose } from "@lemmaoracle/sdk";
 
 const { secretKey, publicKey } = await disclose.generateKeyPair();
 // Store secretKey securely (env var, secret manager, etc.)
@@ -89,58 +89,57 @@ console.log("publicKey:", Buffer.from(publicKey).toString("hex"));
 Save `secretKey` as a CI secret (`LEMMA_BBS_SECRET_KEY`).
 You will not need to regenerate this unless you rotate keys.
 
-### Step 2: Normalize the article
+### Step 2: Normalize and commit
 
-The normalize WASM converts your raw article into circuit-ready attributes.
-Use the pre-built WASM from `packages/normalize`:
+The SDK fetches the deployed schema artifact (including the normalize WASM)
+and runs normalization + Poseidon commitment in a single call:
 
 ```ts
-import init, { normalize } from "@example-x402/normalize/pkg/normalize.js";
+import { schemas, define, prepare } from "@lemmaoracle/sdk";
 
-await init();
+const client = { apiBase: "https://api.lemmaoracle.com" };
 
-const normJson = normalize(JSON.stringify({
-  title:       "My Blog Post",
-  author:      "did:example:you",
-  body:        "Full article body text...",
-  publishedAt: "2026-04-08T12:00:00Z",
-  lang:        "en",
-}));
+// Fetch the deployed schema (includes normalize WASM artifact)
+const schemaMeta = await schemas.getById(client, "blog-article");
+const schema = await define(schemaMeta);
 
-const norm = JSON.parse(normJson);
-// norm = { author, published, integrity, words, lang }
+// prepare() calls the normalize WASM internally — no manual import needed
+const prep = await prepare(client, {
+  schema: schema.id,
+  payload: {
+    title:       "My Blog Post",
+    author:      "did:example:you",
+    body:        "Full article body text...",
+    publishedAt: "2026-04-08T12:00:00Z",
+    lang:        "en",
+  },
+});
+
+// prep.normalized  → { author, published, integrity, words, lang }
+// prep.commitments → { root, leaves, randomness }
+// prep.depth       → Merkle tree depth
 ```
 
-If your environment cannot run WASM (e.g. edge functions without WASM support),
-call the equivalent logic directly — the normalize output is:
-
-| Field | Derivation |
-|---|---|
-| `author` | pass-through |
-| `published` | ISO 8601 → unix seconds |
-| `integrity` | SHA-256 hex of `body` |
-| `words` | whitespace word count |
-| `lang` | pass-through |
+No manual WASM import is needed — `prepare` resolves the artifact
+registered with the schema and runs it internally.
 
 ### Step 3: Sign and create selective disclosure
 
 ```ts
-import { disclose } from "@lemmaoracle/lemma";
-import type { LemmaClient } from "@lemmaoracle/spec";
+import { disclose } from "@lemmaoracle/sdk";
 
-const client: LemmaClient = { apiBase: "https://api.lemmaoracle.com" };
 const header = new TextEncoder().encode("blog-article-v1");
 
 // All attributes as a flat object — keys are sorted deterministically
 // by payloadToMessages into "key:value" strings for BBS+ signing.
 const payload = {
-  author:    norm.author,
+  author:    prep.normalized.author,
   body:      article.body,       // full body goes into BBS+ message vector
-  integrity: norm.integrity,
-  lang:      norm.lang,
-  published: String(norm.published),
+  integrity: prep.normalized.integrity,
+  lang:      prep.normalized.lang,
+  published: String(prep.normalized.published),
   title:     article.title,      // full title goes into BBS+ message vector
-  words:     String(norm.words),
+  words:     String(prep.normalized.words),
 };
 
 // Sign all attributes
@@ -178,39 +177,32 @@ const sd = disclose.toSelectiveDisclosure(revealed, {
 ### Step 4: Register with Lemma
 
 ```ts
-const LEMMA_API = "https://api.lemmaoracle.com";
-const docHash = `0x${norm.integrity}`;  // SHA-256 of body as doc identifier
+import { documents, proofs } from "@lemmaoracle/sdk";
+
+const docHash = `0x${prep.normalized.integrity}`;
 
 // 4a. Register the document
-await fetch(`${LEMMA_API}/documents/register`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    docHash,
-    schemaId:  "blog-article",
-    issuerId:  "did:example:you",
-    subjectId: "did:example:you",
-    attributes: [
-      { name: "author",    value: norm.author,    type: "string" },
-      { name: "published", value: norm.published,  type: "number" },
-      { name: "integrity", value: norm.integrity,  type: "string" },
-      { name: "words",     value: norm.words,       type: "number" },
-      { name: "lang",      value: norm.lang,        type: "string" },
-    ],
-  }),
+await documents.register(client, {
+  schema: schema.id,
+  docHash,
+  issuerId:  "did:example:you",
+  subjectId: "did:example:you",
+  attributes: prep.normalized,
+  commitments: {
+    scheme: "poseidon",
+    root: prep.commitments.root,
+    leaves: prep.commitments.leaves,
+    randomness: prep.commitments.randomness,
+  },
 });
 
 // 4b. Submit proof with selective disclosure
-await fetch(`${LEMMA_API}/proofs/submit`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    docHash,
-    circuitId: "blog-article-v1",
-    proof:     "",  // placeholder — production: snarkjs.groth16.fullProve output
-    inputs:    [norm.author, String(norm.published), norm.integrity, String(norm.words), norm.lang],
-    disclosure: sd,
-  }),
+await proofs.submit(client, {
+  docHash,
+  circuitId: "blog-article-v1",
+  proof:     "",  // placeholder — production: snarkjs.groth16.fullProve output
+  inputs:    [prep.normalized.author, String(prep.normalized.published), prep.normalized.integrity, String(prep.normalized.words), prep.normalized.lang],
+  disclosure: sd,
 });
 ```
 
