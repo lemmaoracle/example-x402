@@ -276,6 +276,79 @@ add_action('publish_post', function($post_id) {
 
 ---
 
+## AI Redirection System
+
+The example-x402 project now includes an AI redirection system to prevent AI agents from bypassing the payment gateway when accessing public blog content.
+
+### How It Works
+
+1. **AI Detection**: The worker detects AI agents using:
+   - User-Agent patterns (OpenAI, Claude, GPT, etc.)
+   - `X-Requested-With: AI` header
+   - `Sec-Purpose: fetch` header
+
+2. **Redirect Logic**:
+   - **Human users**: Redirected to the original free blog
+   - **AI agents**: Directed to the payment gateway (`/query` endpoint)
+
+3. **Content Hierarchy**:
+   - **Free tier**: Basic metadata (title, author, date) with ZK proofs
+   - **Paid tier**: Full content access via x402 micropayments
+
+### Integration Options
+
+#### Static Blogs (JavaScript)
+Add `scripts/ai-redirect.js` to your blog template:
+
+```html
+<script>
+  window.currentSlug = 'your-article-slug'; // Set this dynamically
+</script>
+<script src="/path/to/ai-redirect.js"></script>
+```
+
+#### WordPress
+Use `scripts/wordpress-ai-redirect.php` as a WordPress plugin.
+
+#### Manual Integration
+For custom setups, detect AI agents and redirect to:
+```
+https://your-worker.workers.dev/ai-content/{slug}
+```
+
+### Testing
+
+Run the test scripts to verify AI detection:
+
+```bash
+# Test AI detection logic
+node scripts/test-ai-detection.js
+
+# Test worker endpoints (requires running worker)
+WORKER_URL=http://localhost:8787 node scripts/test-worker-endpoints.js
+```
+
+### Extended Schema for Full Content
+
+The `blog-article` schema has been extended to support full HTML/Markdown content:
+
+```typescript
+// New fields in registration payload
+{
+  title: "...",
+  author: "...",
+  body: "...",
+  publishedAt: "...",
+  lang: "...",
+  fullContent: "<html>...</html>",  // Full content for AI access
+  contentType: "html"               // "html", "markdown", or "plain"
+}
+```
+
+Use `scripts/register-with-full-content.ts` for registering articles with full content support.
+
+---
+
 ## Project Structure
 
 ```
@@ -288,6 +361,11 @@ scripts/
   register-lemma-artifacts.mjs   Upload WASM/zkey to IPFS + register schema & circuit
   check-balance.ts               Check agent wallet USDC balance on Monad testnet
   generate-bbs-keypair.ts        Generate BBS+ key pair for selective disclosure
+  ai-redirect.js                 JavaScript for AI redirection on static blogs
+  wordpress-ai-redirect.php      WordPress plugin for AI redirection
+  register-with-full-content.ts  Register articles with full content support
+  test-ai-detection.js           Test AI detection logic
+  test-worker-endpoints.js       Test worker endpoints with different user agents
 ```
 
 ## Register Custom Artifacts

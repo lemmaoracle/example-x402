@@ -11,7 +11,9 @@
  */
 
 import { Hono } from "hono";
-import { paymentMiddleware, Network } from "x402-hono";
+import { paymentMiddleware, x402ResourceServer } from "@x402/hono";
+import { ExactEvmScheme } from "@x402/evm/exact/server";
+import { HTTPFacilitatorClient } from "@x402/core/server";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -131,15 +133,30 @@ const app = new Hono<{ Bindings: Env }>();
 app.use(
   "/query",
   async (c, next) => {
+    // Create facilitator client (using public testnet facilitator)
+    const facilitatorClient = new HTTPFacilitatorClient({
+      url: "https://x402.org/facilitator"
+    });
+
+    // Create resource server and register EVM scheme
+    const server = new x402ResourceServer(facilitatorClient);
+    // Note: Monad testnet CAIP-2 identifier. Using eip155:10143 for Monad testnet
+    server.register("eip155:10143", new ExactEvmScheme());
+
     const middleware = paymentMiddleware(
-      c.env.PAY_TO_ADDRESS as `0x${string}`,
       {
         "POST /query": {
-          price: "$0.001",
-          network: "monad-testnet" as Network,
-          description:
-            "ZK-verified blog articles with BBS+ selective disclosure",
-          extra: {
+          accepts: [
+            {
+              scheme: "exact",
+              price: "$0.001",
+              network: "eip155:10143", // Monad testnet CAIP-2 identifier
+              payTo: c.env.PAY_TO_ADDRESS as `0x${string}`,
+            },
+          ],
+          description: "ZK-verified blog articles with BBS+ selective disclosure",
+          mimeType: "application/json",
+          extensions: {
             lemmaAttestation: {
               circuitId: "blog-article-v1",
               schema: "blog-article",
@@ -160,12 +177,9 @@ app.use(
           },
         },
       },
-      {
-        // Self-verify mode: worker verifies the payment on-chain directly.
-        // Required for networks not supported by the public x402 facilitator.
-        url: "https://testnet-rpc.monad.xyz",
-      },
+      server,
     );
+    
     return middleware(c, next);
   },
 );
@@ -188,7 +202,7 @@ app.post("/query", async (c) => {
   // use the empty opt-in to request unconditioned disclosures.
   const body = {
     ...callerBody,
-    disclosure: callerBody.disclosure ?? { proof: "", inputs: [] },
+    disclosure: (callerBody as Record<string, unknown>).disclosure ?? { proof: "", inputs: [] },
   };
 
   const headers: Record<string, string> = {
@@ -218,7 +232,123 @@ app.post("/query", async (c) => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// AI Detection Middleware
+// ---------------------------------------------------------------------------
+
+/**
+ * Detect if the request is from an AI agent.
+ * Uses User-Agent, X-Requested-With, and Sec-Purpose headers.
+ */
+const detectAI = (c: any): boolean => {
+  const userAgent = c.req.header("User-Agent") || "";
+  const xRequestedWith = c.req.header("X-Requested-With");
+  const secPurpose = c.req.header("Sec-Purpose");
+  
+  // Common AI/LLM User-Agent patterns
+  const aiPatterns = [
+    "OpenAI",
+    "Claude",
+    "GPT",
+    "ChatGPT",
+    "Bard",
+    "Gemini",
+    "Cohere",
+    "Anthropic",
+    "AI",
+    "LLM",
+    "Language-Model",
+    "Agent",
+    "Crawler",
+    "Bot",
+    "Scraper"
+  ];
+  
+  const isAIUserAgent = aiPatterns.some(pattern => 
+    userAgent.toLowerCase().includes(pattern.toLowerCase())
+  );
+  
+  return isAIUserAgent || 
+         xRequestedWith === "AI" || 
+         secPurpose === "fetch";
+};
+
+// ---------------------------------------------------------------------------
+// AI Redirect Endpoints
+// ---------------------------------------------------------------------------
+
+// AI detection middleware for /ai-content/* paths
+app.use("/ai-content/*", async (c, next) => {
+  const isAI = detectAI(c);
+  
+  if (!isAI) {
+    // Human users get redirected to the original blog
+    // For now, return a message. In production, this would redirect to the actual blog URL.
+    return c.json(
+      { 
+        message: "Human detected. Please visit the original blog URL for free access.",
+        redirect: "https://example-blog.com" // Placeholder
+      }, 
+      302
+    );
+  }
+  
+  // AI agents proceed to payment gate
+  await next();
+});
+
+// Article-specific endpoint for AI access
+app.get("/ai-content/:slug", async (c) => {
+  const slug = c.req.param("slug");
+  
+  // This endpoint provides metadata to help AI decide whether to pay
+  // In production, you would:
+  // 1. Look up the article by slug in your database
+  // 2. Map to docHash and other metadata
+  // 3. Return quality hints similar to the 402 response
+  
+  return c.json({
+    slug,
+    title: `Example Blog Post: ${slug}`,
+    author: "did:example:author",
+    published: "2026-04-08",
+    wordCount: 1500,
+    language: "en",
+    message: "AI detected. To access ZK-verified content, make a POST request to /query endpoint.",
+    paymentRequired: true,
+    endpoint: "/query",
+    price: "$0.001 USDC per query",
+    qualityHints: {
+      attributes: ["author", "published", "words", "lang", "integrity"],
+      freshness: "2026-04-08",
+      wordCountRange: [1000, 2000],
+      languages: ["en", "ja"]
+    }
+  });
+});
+
+// Helper function to simulate article lookup by slug
+const getArticleMetadataBySlug = (slug: string) => {
+  // In production, this would query a database
+  return {
+    docHash: "0x" + "a1b2c3d4".repeat(8), // Placeholder
+    title: `Blog Post: ${slug}`,
+    author: "did:example:author",
+    publishedAt: "2026-04-08T12:00:00Z"
+  };
+};
+
+// ---------------------------------------------------------------------------
 // Health check
-app.get("/", (c) => c.json({ status: "ok", service: "lemma-query-worker" }));
+// ---------------------------------------------------------------------------
+app.get("/", (c) => c.json({ 
+  status: "ok", 
+  service: "lemma-query-worker",
+  endpoints: {
+    query: "POST /query (payment required)",
+    aiContent: "GET /ai-content/:slug (AI detection + redirect)",
+    health: "GET /"
+  }
+}));
 
 export default app;

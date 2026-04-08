@@ -11,9 +11,11 @@
   },
   "dependencies": {
     "@lemmaoracle/sdk": "0.0.16",
-    "@lemmaoracle/spec": "0.0.16"
+    "@lemmaoracle/spec": "0.0.16",
+    "viem": "^2.21.54"
   },
   "devDependencies": {
+    "@types/node": "^22.10.5",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   }

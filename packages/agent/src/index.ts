@@ -7,7 +7,9 @@
  *   AGENT_PRIVATE_KEY=0x... WORKER_URL=https://... tsx src/index.ts
  */
 
-import { createX402Fetch } from "@x402/fetch";
+import { wrapFetchWithPayment } from "@x402/fetch";
+import { x402Client } from "@x402/core/client";
+import { ExactEvmScheme } from "@x402/evm/exact/client";
 import { privateKeyToAccount } from "viem/accounts";
 import { monadTestnet } from "viem/chains";
 
@@ -31,14 +33,22 @@ if (!AGENT_PRIVATE_KEY) {
 }
 
 // ---------------------------------------------------------------------------
-// Setup x402 auto-payment fetch
+// Setup x402 auto-payment fetch (v2)
 // ---------------------------------------------------------------------------
 const account = privateKeyToAccount(AGENT_PRIVATE_KEY);
 console.log(`Agent wallet: ${account.address}`);
 
-const x402Fetch = createX402Fetch(account, {
-  chain: monadTestnet,
-});
+// Create x402 client with EVM exact scheme
+const client = new x402Client();
+// Create a signer for the EVM scheme
+const signer = {
+  address: account.address,
+  signTypedData: account.signTypedData.bind(account),
+};
+client.register("eip155:10143", new ExactEvmScheme(signer));
+
+// Wrap fetch with auto-payment
+const x402Fetch = wrapFetchWithPayment(fetch, client);
 
 // ---------------------------------------------------------------------------
 // Query the worker

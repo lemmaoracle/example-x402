@@ -25,6 +25,12 @@ struct BlogArticle {
     #[serde(rename = "publishedAt")]
     published_at: String,
     lang: String,
+    /// Full HTML/Markdown content for AI access (optional)
+    #[serde(default)]
+    full_content: Option<String>,
+    /// Content type: "html", "markdown", or "plain" (optional)
+    #[serde(default, rename = "contentType")]
+    content_type: Option<String>,
 }
 
 // ── Output ─────────────────────────────────────────────────────────
@@ -45,6 +51,12 @@ struct NormArticle {
     words: u32,
     /// ISO 639-1 language code, passed through unchanged.
     lang: String,
+    /// SHA-256 hex digest of full content (if provided).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    full_content_hash: Option<String>,
+    /// Content type identifier.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    content_type: Option<String>,
 }
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -163,12 +175,17 @@ pub fn normalize(raw_json: &str) -> String {
     let article: BlogArticle =
         serde_json::from_str(raw_json).expect("normalize: invalid blog article JSON input");
 
+    let full_content_hash = article.full_content.as_ref()
+        .map(|content| sha256_hex(content));
+    
     let norm = NormArticle {
         author: article.author,
         published: iso_to_unix(&article.published_at),
         integrity: sha256_hex(&article.body),
         words: count_words(&article.body),
         lang: article.lang,
+        full_content_hash,
+        content_type: article.content_type,
     };
 
     serde_json::to_string(&norm).expect("normalize: serialization error")
@@ -196,6 +213,31 @@ mod tests {
         assert_eq!(out["lang"], "en");
         // integrity is a 64-char hex SHA-256
         assert_eq!(out["integrity"].as_str().unwrap().len(), 64);
+        // New fields should not be present when not provided
+        assert!(out.get("full_content_hash").is_none());
+        assert!(out.get("content_type").is_none());
+    }
+    
+    #[test]
+    fn test_article_with_full_content() {
+        let input = r#"{
+            "title": "AI and Blockchain",
+            "author": "did:example:bob",
+            "body": "Artificial intelligence meets blockchain technology.",
+            "publishedAt": "2026-04-08T12:00:00Z",
+            "lang": "en",
+            "full_content": "<article><h1>AI and Blockchain</h1><p>Artificial intelligence meets blockchain technology in this comprehensive analysis.</p><p>This is the full HTML content with detailed analysis.</p></article>",
+            "contentType": "html"
+        }"#;
+        let out: serde_json::Value = serde_json::from_str(&normalize(input)).unwrap();
+        assert_eq!(out["author"], "did:example:bob");
+        assert_eq!(out["words"], 3);
+        assert_eq!(out["lang"], "en");
+        // Check that full_content_hash is present and valid
+        assert!(out["full_content_hash"].is_string());
+        let hash = out["full_content_hash"].as_str().unwrap();
+        assert_eq!(hash.len(), 64); // SHA-256 hex
+        assert_eq!(out["content_type"], "html");
     }
 
     #[test]

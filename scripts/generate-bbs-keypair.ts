@@ -39,8 +39,10 @@ async function main() {
   }
 }
 
-if (require.main === module) {
-  main();
-}
+// ES module entry point
+main().catch((error) => {
+  console.error("Error in main:", error);
+  process.exit(1);
+});
 
 export { main };

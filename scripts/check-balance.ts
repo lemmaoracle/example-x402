@@ -25,20 +25,26 @@ const client = createPublicClient({
   transport: http("https://testnet-rpc.monad.xyz"),
 });
 
-const balance = await client.readContract({
-  address: USDC_ADDRESS,
-  abi: erc20Abi,
-  functionName: "balanceOf",
-  args: [account.address],
-});
+async function main() {
+  const balance = await client.readContract({
+    address: USDC_ADDRESS,
+    abi: erc20Abi,
+    functionName: "balanceOf",
+    args: [account.address],
+    authorizationList: undefined,
+  } as any);
 
-const decimals = await client.readContract({
-  address: USDC_ADDRESS,
-  abi: erc20Abi,
-  functionName: "decimals",
-});
+  const decimals = await client.readContract({
+    address: USDC_ADDRESS,
+    abi: erc20Abi,
+    functionName: "decimals",
+    authorizationList: undefined,
+  } as any);
 
-const humanBalance = Number(balance) / Math.pow(10, decimals);
+  const humanBalance = Number(balance) / Math.pow(10, decimals);
 
-console.log(`Wallet: ${account.address}`);
-console.log(`USDC balance (Monad testnet): ${humanBalance.toFixed(6)} USDC`);
+  console.log(`Wallet: ${account.address}`);
+  console.log(`USDC balance (Monad testnet): ${humanBalance.toFixed(6)} USDC`);
+}
+
+main().catch(console.error);
