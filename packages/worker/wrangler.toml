@@ -4,7 +4,7 @@ compatibility_date = "2024-12-30"
 compatibility_flags = ["nodejs_compat"]
 
 [vars]
-LEMMA_API_BASE = "https://api.lemmaoracle.com"
+LEMMA_API_BASE = "https://workers.lemma.workers.dev"
 
 # Secrets (set via `npx wrangler secret put`):
 #   PAY_TO_ADDRESS  — wallet address to receive x402 payments
