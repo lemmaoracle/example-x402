@@ -10,8 +10,8 @@
  */
 
 import { Hono } from "hono";
-import { normalize, toInputs } from "@example-x402/normalize";
-import type { RowDoc } from "@example-x402/normalize";
+// @ts-expect-error — wasm-pack output has no TS declarations
+import init, { normalize as wasmNormalize } from "../../normalize/pkg/normalize.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -25,9 +25,27 @@ type Env = {
   readonly ISSUER_ID?: string;
 };
 
+/** Raw blog article (rowDoc). */
+type BlogArticle = Readonly<{
+  title: string;
+  author: string;
+  body: string;
+  publishedAt: string;
+  lang: string;
+}>;
+
+/** Normalized article attributes (normDoc output from WASM). */
+type NormArticle = Readonly<{
+  author: string;
+  published: number;
+  integrity: string;
+  words: number;
+  lang: string;
+}>;
+
 type GenerateRequest = Readonly<{
   /** Raw blog article. */
-  article: RowDoc;
+  article: BlogArticle;
   /** Subject DID (the author). */
   subjectId: string;
   /** Optional: override issuer DID (defaults to env.ISSUER_ID). */
@@ -73,13 +91,7 @@ const lemmaFetch = async (
   });
 };
 
-/**
- * Derive a deterministic document hash from the commitment.
- * In production, Lemma computes this server-side; for the demo
- * we derive it client-side for immediate feedback.
- */
-const commitmentToDocHash = (commitment: bigint): string =>
-  `0x${commitment.toString(16).padStart(64, "0")}`;
+
 
 // ---------------------------------------------------------------------------
 // App
@@ -103,20 +115,32 @@ app.post("/generate", async (c) => {
     );
   }
 
-  // 1. Normalize rowDoc → normDoc
-  const norm = await normalize(req.article);
-  const docHash = commitmentToDocHash(norm.commitment);
-  const inputs = toInputs(norm);
+  // 1. Initialize WASM and normalize rowDoc → normDoc
+  await init();
+  const normJson = wasmNormalize(JSON.stringify(req.article));
+  const norm: NormArticle = JSON.parse(normJson);
   const issuerId = req.issuerId ?? c.env.ISSUER_ID ?? "did:example:publisher";
+
+  // Derive deterministic doc hash from integrity (SHA-256 of body)
+  const docHash = `0x${norm.integrity}`;
 
   // Public attributes stored in Lemma (queryable, ZK-verified)
   const attributes: Record<string, unknown> = {
-    author: req.article.author,
-    published: Number(norm.published),
-    integrity: norm.integrityHash.toString(),
-    words: Number(norm.words),
-    lang: req.article.lang,
+    author: norm.author,
+    published: norm.published,
+    integrity: norm.integrity,
+    words: norm.words,
+    lang: norm.lang,
   };
+
+  // Circuit inputs (string-encoded field elements)
+  const inputs: ReadonlyArray<string> = [
+    norm.author,
+    String(norm.published),
+    norm.integrity,
+    String(norm.words),
+    norm.lang,
+  ];
 
   // 2. Register document with Lemma
   const regResponse = await lemmaFetch(c.env, "/documents/register", {

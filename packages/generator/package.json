@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "hono": "^4.6.14",
-    "@example-x402/normalize": "workspace:*",
     "@lemmaoracle/lemma": "^0.1.0"
   },
   "devDependencies": {

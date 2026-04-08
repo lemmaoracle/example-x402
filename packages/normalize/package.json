@@ -1,19 +1,9 @@
 {
-  "name": "@example-x402/normalize",
-  "private": true,
+  "name": "normalize",
   "version": "0.1.0",
-  "type": "module",
-  "main": "src/index.ts",
+  "private": true,
   "scripts": {
-    "test": "vitest run",
-    "type-check": "tsc --noEmit"
-  },
-  "dependencies": {
-    "circomlibjs": "^0.1.7"
-  },
-  "devDependencies": {
-    "typescript": "^5.7.3",
-    "vitest": "^2.1.8",
-    "@types/node": "^22.10.5"
+    "build": "bash build.sh",
+    "test": "cargo test"
   }
 }
