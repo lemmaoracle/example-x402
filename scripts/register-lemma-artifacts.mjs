@@ -1,18 +1,18 @@
 #!/usr/bin/env node
 /**
- * Lemma アーティファクト登録スクリプト。
+ * Lemma artifact registration script.
  *
- * ビルド済み WASM/zkey を Pinata IPFS にアップロードし、
- * Lemma API にスキーマとサーキットを登録する。初回デプロイ時に一度だけ実行。
+ * Uploads built WASM/zkey to Pinata IPFS, then registers
+ * the schema and circuit with the Lemma API. Run once on initial deploy.
  *
- * 前提条件:
- *   1. packages/normalize を wasm-pack build 済み  → pkg/
- *   2. packages/circuit を circom + snarkjs ビルド済み → build/
+ * Prerequisites:
+ *   1. packages/normalize built with wasm-pack  → pkg/
+ *   2. packages/circuit built with circom + snarkjs → build/
  *
  * Usage:
  *   node scripts/register-lemma-artifacts.mjs
  *
- * 必要な環境変数 (.env):
+ * Required environment variables (.env):
  *   PINATA_API_KEY, PINATA_SECRET_API_KEY   — Pinata IPFS
  *   LEMMA_API_KEY                           — Lemma API
  *   VERIFIER_CONTRACT  (optional)           — on-chain verifier address

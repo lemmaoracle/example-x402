@@ -199,11 +199,11 @@ mod tests {
     }
 
     #[test]
-    fn test_japanese_article() {
+    fn test_positive_tz_offset() {
         let input = r#"{
-            "title": "ブロックチェーンの未来",
+            "title": "The Future of Blockchain",
             "author": "did:example:charlie",
-            "body": "ブロックチェーン技術は長年にわたりインターネットの課題でした。従来の決済システムでは少額決済のコストが高すぎたためです。",
+            "body": "Blockchain technology has been an internet challenge for years. Traditional payment systems made micropayments too costly.",
             "publishedAt": "2026-04-08T09:00:00+09:00",
             "lang": "ja"
         }"#;
@@ -212,8 +212,7 @@ mod tests {
         // 2026-04-08T09:00:00+09:00 = 2026-04-08T00:00:00Z
         assert_eq!(out["published"], 1775606400_i64);
         assert_eq!(out["lang"], "ja");
-        // CJK word count: chars / 2
-        assert!(out["words"].as_u64().unwrap() > 10);
+        assert_eq!(out["words"], 16);
     }
 
     #[test]

@@ -1,17 +1,17 @@
 # normalize
 
-Blog article rowDoc → normDoc 変換 WASM (Rust)。
+Rust WASM that converts a raw blog article (rowDoc) into circuit-ready attributes (normDoc).
 
-## ビルド
+## Build
 
 ```bash
-# wasm-pack が必要: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+# Requires wasm-pack: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 pnpm build
 ```
 
-出力: `pkg/normalize_bg.wasm` + SHA-256 ハッシュ
+Output: `pkg/normalize_bg.wasm` + SHA-256 hash
 
-## abi (Lemma schemas.register 用)
+## ABI (for Lemma schemas.register)
 
 ```json
 {
@@ -20,7 +20,7 @@ pnpm build
 }
 ```
 
-## テスト
+## Test
 
 ```bash
 cargo test
