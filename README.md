@@ -1,23 +1,26 @@
 # example-x402
 
-**Pay-per-query ZK-verified blog articles in 5 minutes** — [Lemma](https://lemmaoracle.com) × [x402](https://x402.org) on Monad testnet.
+**Content is free. Trust costs $0.001.** — [Lemma](https://lemmaoracle.com) × [x402](https://x402.org) on Monad testnet.
 
-An AI agent pays a Cloudflare Worker a micro-fee per query. The worker forwards
-the request to the Lemma API, returning ZK-verified attributes and BBS+ selective
-disclosures (title, body) only after payment clears.
+An AI agent fetches a blog article for free, discovers that a Lemma attestation
+is available, then pays $0.001 USDC to verify its provenance — author, publication
+date, content integrity — all backed by ZK proofs.
 
-> This demo uses blog articles as the example, but Lemma works with any verifiable
-> data — research reports, credentials, IoT sensor readings, financial attestations, etc.
+> This demo uses blog articles, but Lemma works with any verifiable data:
+> research reports, credentials, IoT sensor readings, financial attestations, etc.
 
 ```
-                         402 PAYMENT-REQUIRED
-                  ┌─── { extra.lemmaAttestation.hints } ───┐
-                  │   "3 articles, en/ja, Alice/Bob/Charlie" │
-                  │   AI decides: worth $0.001?              │
-                  └──────────────────────────────────────────┘
-                              │ yes → auto-pay
-                              ▼
-Agent ──[$0.001 USDC]──▶ Worker ──[Lemma query]──▶ ZK attributes + disclosed content
+Blog ──[200 OK]──▶ Agent
+ │                   │
+ │  X-Lemma-Attestation header     "Content is here,
+ │  <link rel="lemma-attestation">  but can I trust it?"
+ │                   │
+ │                   ▼
+ │              [$0.001 USDC]
+ │                   │
+ │                   ▼
+ └──────────── Worker (/verify) ──▶ Verified Attributes + proof
+               "Yes — author, date, integrity all check out."
 ```
 
 ## Prerequisites
@@ -61,71 +64,158 @@ Update `WORKER_URL` in `.env` with the deployed URL.
 
 ```bash
 pnpm agent
-# Agent queries the worker, auto-pays via x402, prints ZK-verified articles
+# 4-phase flow: fetch → unverified → pay → verified
+```
+
+For the advanced BBS+ selective disclosure flow:
+
+```bash
+pnpm agent:disclosure
+# Additionally queries POST /query for disclosed title/body
 ```
 
 ---
 
-## Integrate with Your Blog
+## How It Works
 
-This section explains how to register your own blog articles with Lemma
-so they appear in query results behind the x402 paywall.
+### Agent Experience (4 phases)
 
-The registration pipeline runs in your existing tooling — GitHub Actions,
-WordPress hooks, Astro build scripts, a CLI, etc. There is no separate
-service to deploy.
+| Phase | Action | Result |
+|-------|--------|--------|
+| 1 | Agent fetches blog article normally | Content acquired (free) |
+| 2 | Agent displays content | Marked as **unverified** |
+| 3 | Agent discovers `X-Lemma-Attestation` header → pays $0.001 | Verified Attributes received |
+| 4 | Agent compares content hash with `integrity` attribute | Content marked as **verified** |
+
+### Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/verify/:hash` | GET | Provenance verification (main) — returns verified attributes + proof status |
+| `/query` | POST | Full query with BBS+ selective disclosure (advanced) |
+| `/` | GET | Health check |
+
+### 402 Response (before payment)
+
+When an agent hits `GET /verify/:hash` without payment, the worker returns
+`402 Payment Required` with attestation metadata:
+
+```json
+{
+  "lemmaAttestation": {
+    "schema": "blog-article",
+    "verifiable": ["author", "published", "integrity", "words", "lang"]
+  }
+}
+```
+
+### Verified Response (after payment)
+
+```json
+{
+  "results": [{
+    "docHash": "0x...",
+    "schema": "blog-article",
+    "attributes": {
+      "author": "did:example:alice",
+      "published": 1775001600,
+      "words": 1500,
+      "lang": "en",
+      "integrity": "ab12..."
+    },
+    "proof": {
+      "status": "verified",
+      "circuitId": "blog-article-v1"
+    }
+  }]
+}
+```
+
+The agent compares its locally computed SHA-256 of the blog content against
+the `integrity` attribute. If they match, the content is authentic.
+
+---
+
+## Discovery: Integrate with Your Blog
+
+Lemma uses a pull-based discovery model. Your blog signals that attestation
+is available; compatible agents pick it up automatically.
+
+### A: HTTP Response Header (recommended)
+
+Add these headers in your server, CDN, or middleware:
+
+```
+X-Lemma-Attestation: https://your-worker.workers.dev/verify/0xabc123
+X-Lemma-Schema: blog-article-v1
+```
+
+Cloudflare Worker example:
+
+```ts
+// In your blog's Worker or middleware
+export default {
+  async fetch(request, env) {
+    const response = await env.BLOG.fetch(request);
+    const newResponse = new Response(response.body, response);
+    newResponse.headers.set(
+      "X-Lemma-Attestation",
+      `https://your-worker.workers.dev/verify/${docHash}`
+    );
+    newResponse.headers.set("X-Lemma-Schema", "blog-article-v1");
+    return newResponse;
+  },
+};
+```
+
+### B: HTML `<link>` meta tag
+
+Add one line to your blog template's `<head>`:
+
+```html
+<link
+  rel="lemma-attestation"
+  href="https://your-worker.workers.dev/verify/0xabc123"
+  type="application/json+lemma"
+/>
+```
+
+Like `agent-permissions.json`, this is a lightweight declaration — only
+compatible agents react to it; everything else ignores it.
+
+### Snippet Generator
+
+Use the provided script to generate both snippets for an article:
+
+```bash
+pnpm generate-snippet -- --docHash 0xabc123... --worker-url https://your-worker.workers.dev
+```
+
+---
+
+## Registering Articles with Lemma
+
+This section covers the registration pipeline — how your blog articles
+get attested by Lemma so the `/verify` endpoint can serve them.
 
 ### Step 1: Generate a BBS+ key pair (one-time)
-
-Run the provided npm script to generate a BBS+ key pair:
 
 ```bash
 pnpm generate-keypair
 ```
 
-The script will output:
-- `secretKey` (hex): Store securely as an environment variable (`LEMMA_BBS_SECRET_KEY`)
-- `publicKey` (hex): Share with Lemma during issuer registration
-
-Example output:
-```
-Generating BBS+ key pair for Lemma selective disclosure...
-
-=== IMPORTANT: Save these keys securely ===
-
-SECRET KEY (hex):
-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-
-PUBLIC KEY (hex):
-fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
-
-=== Usage Instructions ===
-1. Store the SECRET KEY as an environment variable (e.g., LEMMA_BBS_SECRET_KEY)
-2. Share the PUBLIC KEY with Lemma during issuer registration
-3. Never commit the secret key to version control!
-
-You can set the secret key as an environment variable:
-export LEMMA_BBS_SECRET_KEY="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-```
-
 Save `secretKey` as a CI secret (`LEMMA_BBS_SECRET_KEY`).
-You will not need to regenerate this unless you rotate keys.
 
 ### Step 2: Normalize and commit
-
-The SDK fetches the deployed schema artifact (including the normalize WASM)
-and runs normalization + Poseidon commitment in a single call:
 
 ```ts
 import { schemas, define, prepare } from "@lemmaoracle/sdk";
 
-const client = { apiBase: "https://api.lemmaoracle.com" };
+const client = { apiBase: "https://workers.lemma.workers.dev" };
 
-// Fetch the deployed schema (includes normalize WASM artifact)
 const schemaMeta = await schemas.getById(client, "blog-article");
 const schema = await define(schemaMeta);
 
-// prepare() calls the normalize WASM internally — no manual import needed
 const prep = await prepare(client, {
   schema: schema.id,
   payload: {
@@ -139,11 +229,7 @@ const prep = await prepare(client, {
 
 // prep.normalized  → { author, published, integrity, words, lang }
 // prep.commitments → { root, leaves, randomness }
-// prep.depth       → Merkle tree depth
 ```
-
-No manual WASM import is needed — `prepare` resolves the artifact
-registered with the schema and runs it internally.
 
 ### Step 3: Sign and create selective disclosure
 
@@ -152,29 +238,25 @@ import { disclose } from "@lemmaoracle/sdk";
 
 const header = new TextEncoder().encode("blog-article-v1");
 
-// All attributes as a flat object — keys are sorted deterministically
-// by payloadToMessages into "key:value" strings for BBS+ signing.
 const payload = {
   author:    prep.normalized.author,
-  body:      article.body,       // full body goes into BBS+ message vector
+  body:      article.body,
   integrity: prep.normalized.integrity,
   lang:      prep.normalized.lang,
   published: String(prep.normalized.published),
-  title:     article.title,      // full title goes into BBS+ message vector
+  title:     article.title,
   words:     String(prep.normalized.words),
 };
 
-// Sign all attributes
 const messages = disclose.payloadToMessages(payload);
 const signed = await disclose.sign(client, {
   messages,
-  secretKey,   // from Step 1
+  secretKey,
   header,
   issuerId: "did:example:you",
 });
 
-// Selective disclosure: reveal title + body (hide everything else)
-// Indexes correspond to the sorted key order of payload.
+// Selective disclosure: reveal title + body
 // Sorted keys: author, body, integrity, lang, published, title, words
 //              0       1     2          3     4          5      6
 const TITLE_IDX = 5;
@@ -193,7 +275,6 @@ const sd = disclose.toSelectiveDisclosure(revealed, {
   header,
   count: messages.length,
 });
-// sd is a SelectiveDisclosure object ready for Lemma submission
 ```
 
 ### Step 4: Register with Lemma
@@ -203,7 +284,6 @@ import { documents, proofs } from "@lemmaoracle/sdk";
 
 const docHash = `0x${prep.normalized.integrity}`;
 
-// 4a. Register the document
 await documents.register(client, {
   schema: schema.id,
   docHash,
@@ -218,17 +298,22 @@ await documents.register(client, {
   },
 });
 
-// 4b. Submit proof with selective disclosure
 await proofs.submit(client, {
   docHash,
   circuitId: "blog-article-v1",
-  proof:     "",  // placeholder — production: snarkjs.groth16.fullProve output
-  inputs:    [prep.normalized.author, String(prep.normalized.published), prep.normalized.integrity, String(prep.normalized.words), prep.normalized.lang],
+  proof:     "",
+  inputs:    [
+    prep.normalized.author,
+    String(prep.normalized.published),
+    prep.normalized.integrity,
+    String(prep.normalized.words),
+    prep.normalized.lang,
+  ],
   disclosure: sd,
 });
 ```
 
-### Example: GitHub Action
+### GitHub Action Example
 
 ```yaml
 # .github/workflows/register-articles.yml
@@ -248,176 +333,28 @@ jobs:
       - name: Register new/changed articles
         env:
           LEMMA_BBS_SECRET_KEY: ${{ secrets.LEMMA_BBS_SECRET_KEY }}
-          LEMMA_API_BASE: https://api.lemmaoracle.com
-        run: |
-          # Your script that:
-          # 1. Finds changed .md files in content/
-          # 2. Parses frontmatter (title, author, lang, date)
-          # 3. Runs Steps 2–4 above for each article
-          pnpm tsx scripts/register.ts
-```
-
-### Example: WordPress hook (conceptual)
-
-```php
-add_action('publish_post', function($post_id) {
-    $post = get_post($post_id);
-    // Call a Node.js sidecar or serverless function
-    // that runs Steps 2–4 with the post content
-    wp_remote_post('https://your-lambda.example.com/register', [
-        'body' => json_encode([
-            'title' => $post->post_title,
-            'body'  => wp_strip_all_tags($post->post_content),
-            'lang'  => get_locale(),
-        ]),
-    ]);
-});
+          LEMMA_API_BASE: https://workers.lemma.workers.dev
+        run: pnpm tsx scripts/register.ts
 ```
 
 ---
 
-## AI Redirection System
+## Advanced: BBS+ Selective Disclosure
 
-The example-x402 project now includes an AI redirection system to prevent AI agents from bypassing the payment gateway when accessing public blog content.
-
-### How It Works
-
-1. **AI Detection**: The worker detects AI agents using:
-   - User-Agent patterns (OpenAI, Claude, GPT, etc.)
-   - `X-Requested-With: AI` header
-   - `Sec-Purpose: fetch` header
-
-2. **Redirect Logic**:
-   - **Human users**: Redirected to the original free blog
-   - **AI agents**: Directed to the payment gateway (`/query` endpoint)
-
-3. **Content Hierarchy**:
-   - **Free tier**: Basic metadata (title, author, date) with ZK proofs
-   - **Paid tier**: Full content access via x402 micropayments
-
-### Integration Options
-
-#### Static Blogs (JavaScript)
-Add `scripts/ai-redirect.js` to your blog template:
-
-```html
-<script>
-  window.currentSlug = 'your-article-slug'; // Set this dynamically
-</script>
-<script src="/path/to/ai-redirect.js"></script>
-```
-
-#### WordPress
-Use `scripts/wordpress-ai-redirect.php` as a WordPress plugin.
-
-#### Manual Integration
-For custom setups, detect AI agents and redirect to:
-```
-https://your-worker.workers.dev/ai-content/{slug}
-```
-
-### Testing
-
-Run the test scripts to verify AI detection:
+The `POST /query` endpoint provides full BBS+ selective disclosure — the
+agent can receive disclosed title/body alongside verified attributes. This
+is Lemma's core technical differentiator and useful for agents that need
+the actual content, not just provenance.
 
 ```bash
-# Test AI detection logic
-node scripts/test-ai-detection.js
-
-# Test worker endpoints (requires running worker)
-WORKER_URL=http://localhost:8787 node scripts/test-worker-endpoints.js
+# Run agent with disclosure
+pnpm agent:disclosure
 ```
 
-### Extended Schema for Full Content
+The agent script uses the `--with-disclosure` flag to additionally query
+the `/query` endpoint after the standard verification flow.
 
-The `blog-article` schema has been extended to support full HTML/Markdown content:
-
-```typescript
-// New fields in registration payload
-{
-  title: "...",
-  author: "...",
-  body: "...",
-  publishedAt: "...",
-  lang: "...",
-  fullContent: "<html>...</html>",  // Full content for AI access
-  contentType: "html"               // "html", "markdown", or "plain"
-}
-```
-
-Use `scripts/register-with-full-content.ts` for registering articles with full content support.
-
----
-
-## Project Structure
-
-```
-packages/
-  worker/      Cloudflare Worker — Hono + x402-hono, payment gating + disclosure extraction
-  agent/       Node.js agent — @x402/fetch auto-payment
-  circuit/     Circom circuit — blog-article-v1 (Poseidon commitment, pre-deployed by Lemma)
-  normalize/   Rust WASM — rowDoc → normDoc conversion (pre-deployed by Lemma)
-scripts/
-  register-lemma-artifacts.mjs   Upload WASM/zkey to IPFS + register schema & circuit
-  check-balance.ts               Check agent wallet USDC balance on Monad testnet
-  generate-bbs-keypair.ts        Generate BBS+ key pair for selective disclosure
-  ai-redirect.js                 JavaScript for AI redirection on static blogs
-  wordpress-ai-redirect.php      WordPress plugin for AI redirection
-  register-with-full-content.ts  Register articles with full content support
-  test-ai-detection.js           Test AI detection logic
-  test-worker-endpoints.js       Test worker endpoints with different user agents
-```
-
-## Register Custom Artifacts
-
-If you modify `packages/normalize` or `packages/circuit`, rebuild and
-re-register the artifacts with Lemma:
-
-```bash
-# 1. Build normalize WASM
-cd packages/normalize && wasm-pack build --target web && cd ../..
-
-# 2. Build circuit (circom + snarkjs)
-cd packages/circuit && ./scripts/build.sh && cd ../..
-
-# 3. Upload to IPFS + register schema & circuit in one step
-cp .env.example .env   # fill in PINATA_API_KEY, PINATA_SECRET_API_KEY, LEMMA_API_KEY
-pnpm register
-```
-
-The script uploads all four artifacts (normalize WASM/JS, circuit WASM/zkey)
-to Pinata IPFS, then registers the `blog-article` schema and `blog-article-v1`
-circuit with the Lemma API. Run once per deployment.
-
-## How It Works
-
-### Phase 1: Pre-payment (402 hints)
-
-When the agent hits `POST /query` without payment, the worker returns `402 Payment Required`
-with quality hints in `extra.lemmaAttestation`:
-
-```json
-{
-  "lemmaAttestation": {
-    "circuitId": "blog-article-v1",
-    "schema": "blog-article",
-    "hints": {
-      "attributes": ["author", "published", "words", "lang", "integrity"],
-      "authors": ["did:example:alice", "did:example:bob"],
-      "freshness": "2026-04-08",
-      "langs": ["en", "ja"],
-      "count": 3
-    }
-  }
-}
-```
-
-These hints are visible but unverified. The AI agent uses them to decide whether
-the content is worth paying for.
-
-### Phase 2: Post-payment (ZK-verified response)
-
-After `@x402/fetch` auto-pays, the worker queries Lemma and returns a simplified response:
+### Query Response (after payment)
 
 ```json
 {
@@ -441,9 +378,64 @@ After `@x402/fetch` auto-pays, the worker queries Lemma and returns a simplified
 }
 ```
 
-The `attributes` are ZK-verified and match the 402 hints. The `disclosed` content
-is extracted from the BBS+ selective disclosure envelope — cryptographic data
-(proof, publicKey, indexes) is stripped for cleanliness.
+---
+
+## Demo Helper: AI Redirection
+
+For quick 5-minute demos, the worker includes AI detection endpoints that
+redirect AI agents from a blog to the payment gateway. This is a convenience
+for demonstrations — **for production, use the header/meta tag discovery
+approach described above.**
+
+```bash
+# Test AI detection (no worker needed)
+node scripts/test-ai-detection.js
+
+# Test worker endpoints (requires running worker)
+WORKER_URL=http://localhost:8787 node scripts/test-worker-endpoints.js
+```
+
+See `scripts/ai-redirect.js` (static blogs) and `scripts/wordpress-ai-redirect.php`
+(WordPress) for integration examples.
+
+---
+
+## Project Structure
+
+```
+packages/
+  worker/      Cloudflare Worker — Hono + x402, /verify + /query endpoints
+  agent/       Node.js agent — 4-phase provenance verification demo
+  circuit/     Circom circuit — blog-article-v1 (Poseidon commitment, pre-deployed)
+  normalize/   Rust WASM — rowDoc → normDoc conversion (pre-deployed)
+scripts/
+  generate-snippet.ts           Generate X-Lemma-Attestation header + <link> tag
+  register-lemma-artifacts.mjs  Upload WASM/zkey to IPFS + register schema & circuit
+  check-balance.ts              Check agent wallet USDC balance on Monad testnet
+  generate-bbs-keypair.ts       Generate BBS+ key pair for selective disclosure
+  register-with-full-content.ts Register articles with full content support
+  ai-redirect.js                JavaScript for AI redirection (demo helper)
+  wordpress-ai-redirect.php     WordPress AI redirection plugin (demo helper)
+  test-ai-detection.js          Test AI detection logic
+  test-worker-endpoints.js      Test worker endpoints
+```
+
+## Register Custom Artifacts
+
+If you modify `packages/normalize` or `packages/circuit`, rebuild and
+re-register the artifacts with Lemma:
+
+```bash
+# 1. Build normalize WASM
+cd packages/normalize && wasm-pack build --target web && cd ../..
+
+# 2. Build circuit (circom + snarkjs)
+cd packages/circuit && ./scripts/build.sh && cd ../..
+
+# 3. Upload to IPFS + register schema & circuit in one step
+cp .env.example .env   # fill in PINATA_API_KEY, PINATA_SECRET_API_KEY, LEMMA_API_KEY
+pnpm register
+```
 
 ## Attribute Schema
 

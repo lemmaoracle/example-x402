@@ -7,7 +7,7 @@
 
 import { schemas, define, prepare, disclose, documents, proofs } from "@lemmaoracle/sdk";
 
-const client = { apiBase: "https://api.lemmaoracle.com" };
+const client = { apiBase: "https://workers.lemma.workers.dev" };
 
 async function registerArticleWithFullContent(article: {
   title: string;

@@ -1,13 +1,17 @@
 /**
- * Lemma × x402 query worker.
+ * Lemma × x402 provenance verification worker.
  *
- * Gates the Lemma verified-attributes query behind an x402 micropayment.
- * After payment clears, queries Lemma and returns a simplified response:
- * BBS+ cryptographic envelope is stripped — the caller receives clean
- * `disclosed` attributes alongside ZK-verified public attributes.
+ * Main endpoint: GET /verify/:hash
+ *   — x402 gated ($0.001 USDC). After payment, queries Lemma for
+ *   verified attributes (author, published, integrity, words, lang)
+ *   and proof status for the given document hash.
  *
- * Developers deploy this worker; Lemma registration and proof submission
- * are handled by Lemma's own infrastructure.
+ * Advanced: POST /query
+ *   — x402 gated. Full query API with BBS+ selective disclosure.
+ *   For agents that need content access (title/body) in addition
+ *   to provenance verification.
+ *
+ * Content is free. Trust costs $0.001.
  */
 
 import { Hono } from "hono";
@@ -25,10 +29,7 @@ type Env = {
   readonly LEMMA_API_KEY?: string;
 };
 
-/**
- * Raw SelectiveDisclosure from Lemma API (BBS+ envelope).
- * See @lemmaoracle/spec SelectiveDisclosure.
- */
+/** Raw SelectiveDisclosure from Lemma API (BBS+ envelope). */
 type RawSelectiveDisclosure = Readonly<{
   format: string;
   attributes: Readonly<Record<string, unknown>>;
@@ -58,7 +59,7 @@ type LemmaQueryResponse = Readonly<{
   hasMore: boolean;
 }>;
 
-/** Simplified response item returned to the caller (no BBS+ crypto data). */
+/** Simplified response item (no BBS+ crypto data). */
 type QueryResponseItem = Readonly<{
   docHash: string;
   schema: string;
@@ -73,18 +74,21 @@ type QueryResponseItem = Readonly<{
   proof?: Readonly<Record<string, unknown>>;
 }>;
 
+/** Verify endpoint response — provenance only, no disclosed content. */
+type VerifyResponseItem = Readonly<{
+  docHash: string;
+  schema: string;
+  attributes: Readonly<Record<string, unknown>>;
+  proof: {
+    status: "verified" | "unverified" | "pending";
+    circuitId?: string;
+  };
+}>;
+
 // ---------------------------------------------------------------------------
-// Disclosure extraction
+// Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Extract the disclosed attribute map from a raw SelectiveDisclosure.
- *
- * This is the lightweight equivalent of `disclose.fromSelectiveDisclosure`
- * from @lemmaoracle/sdk — we trust the Lemma API response (the worker
- * calls it directly) and skip BBS+ proof re-verification. The caller
- * receives clean key-value attributes without cryptographic envelope data.
- */
 const extractDisclosed = (
   sd: RawSelectiveDisclosure | null | undefined,
 ): Readonly<Record<string, unknown>> | null =>
@@ -92,24 +96,35 @@ const extractDisclosed = (
     ? sd.attributes
     : null;
 
-/**
- * Transform a Lemma response item into a simplified response for the caller.
- * Strips BBS+ proof/publicKey/indexes/count/header from disclosure.
- */
-const simplifyItem = (item: LemmaResponseItem): QueryResponseItem => {
-  const base: QueryResponseItem = {
-    docHash: item.docHash,
-    schema: item.schema,
-    issuerId: item.issuerId,
-    subjectId: item.subjectId,
-    ...(item.chainId !== undefined ? { chainId: item.chainId } : {}),
-    attributes: item.attributes,
-    disclosed: extractDisclosed(item.disclosure),
-    ...(item.disclosureError ? { disclosureError: item.disclosureError } : {}),
-    ...(item.proof ? { proof: item.proof } : {}),
-  };
-  return base;
-};
+const simplifyItem = (item: LemmaResponseItem): QueryResponseItem => ({
+  docHash: item.docHash,
+  schema: item.schema,
+  issuerId: item.issuerId,
+  subjectId: item.subjectId,
+  ...(item.chainId !== undefined ? { chainId: item.chainId } : {}),
+  attributes: item.attributes,
+  disclosed: extractDisclosed(item.disclosure),
+  ...(item.disclosureError ? { disclosureError: item.disclosureError } : {}),
+  ...(item.proof ? { proof: item.proof } : {}),
+});
+
+const toVerifyItem = (item: LemmaResponseItem): VerifyResponseItem => ({
+  docHash: item.docHash,
+  schema: item.schema,
+  attributes: item.attributes,
+  proof: {
+    status: item.proof ? "verified" : "unverified",
+    ...(item.proof && "circuitId" in item.proof
+      ? { circuitId: item.proof.circuitId as string }
+      : {}),
+  },
+});
+
+/** Build Lemma API headers. */
+const lemmaHeaders = (apiKey?: string): Record<string, string> => ({
+  "Content-Type": "application/json",
+  ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+});
 
 // ---------------------------------------------------------------------------
 // App
@@ -118,29 +133,110 @@ const simplifyItem = (item: LemmaResponseItem): QueryResponseItem => {
 const app = new Hono<{ Bindings: Env }>();
 
 // ---------------------------------------------------------------------------
-// x402 payment middleware
-// Gate POST /query: $0.001 USDC per request on Monad testnet.
-// Uses self-verify mode (@x402/evm) — the Monad network is not supported
-// by the x402 public facilitator, so the worker verifies payments itself.
+// x402 payment middleware — GET /verify/:hash
 //
-// The `extra.lemmaAttestation` field surfaces ZK-verifiable quality hints
-// inside the 402 PAYMENT-REQUIRED header so AI agents can make informed
-// purchasing decisions *before* paying.  After payment, the corresponding
-// attributes are returned with full ZK proof backing.
+// Main endpoint. Returns ZK-verified provenance attributes for a document.
+// $0.001 USDC per verification on Monad testnet.
 //
-// See: https://www.perplexity.ai/page/lemma-nitotutenoshi-suo-.KJBBLmAS7m0vmEmAtP.pw
+// 402 response includes lemmaAttestation hints:
+//   { schema, verifiable }
+// ---------------------------------------------------------------------------
+app.use(
+  "/verify/:hash",
+  async (c, next) => {
+    const facilitatorClient = new HTTPFacilitatorClient({
+      url: "https://x402.org/facilitator",
+    });
+
+    const server = new x402ResourceServer(facilitatorClient);
+    server.register("eip155:10143", new ExactEvmScheme());
+
+    const middleware = paymentMiddleware(
+      {
+        "GET /verify/:hash": {
+          accepts: [
+            {
+              scheme: "exact",
+              price: "$0.001",
+              network: "eip155:10143",
+              payTo: c.env.PAY_TO_ADDRESS as `0x${string}`,
+            },
+          ],
+          description:
+            "Verified provenance attributes for a Lemma-attested document",
+          mimeType: "application/json",
+          extensions: {
+            lemmaAttestation: {
+              schema: "blog-article",
+              verifiable: [
+                "author",
+                "published",
+                "integrity",
+                "words",
+                "lang",
+              ],
+            },
+          },
+        },
+      },
+      server,
+    );
+
+    return middleware(c, next);
+  },
+);
+
+// ---------------------------------------------------------------------------
+// GET /verify/:hash — Provenance verification endpoint
+//
+// After x402 payment clears, queries Lemma for the document matching
+// the given hash and returns verified attributes + proof status.
+//
+// The hash can be a docHash (0x-prefixed). The agent can additionally
+// compare its locally computed SHA-256 of the content against the
+// returned `integrity` attribute to confirm content has not been tampered.
+// ---------------------------------------------------------------------------
+app.get("/verify/:hash", async (c) => {
+  const hash = c.req.param("hash");
+  const apiBase = c.env.LEMMA_API_BASE.replace(/\/$/, "");
+  const apiKey = c.env.LEMMA_API_KEY;
+
+  const response = await fetch(`${apiBase}/verified-attributes/query`, {
+    method: "POST",
+    headers: lemmaHeaders(apiKey),
+    body: JSON.stringify({ docHash: hash }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    return c.json({ error }, response.status as 500);
+  }
+
+  const data = (await response.json()) as LemmaQueryResponse;
+
+  if (data.results.length === 0) {
+    return c.json({ error: "document_not_found", docHash: hash }, 404);
+  }
+
+  return c.json({
+    results: data.results.map(toVerifyItem),
+  });
+});
+
+// ---------------------------------------------------------------------------
+// x402 payment middleware — POST /query (Advanced)
+//
+// Full query endpoint with BBS+ selective disclosure. For agents that
+// need disclosed content (title, body) alongside verified attributes.
 // ---------------------------------------------------------------------------
 app.use(
   "/query",
   async (c, next) => {
-    // Create facilitator client (using public testnet facilitator)
     const facilitatorClient = new HTTPFacilitatorClient({
-      url: "https://x402.org/facilitator"
+      url: "https://x402.org/facilitator",
     });
 
-    // Create resource server and register EVM scheme
     const server = new x402ResourceServer(facilitatorClient);
-    // Note: Monad testnet CAIP-2 identifier. Using eip155:10143 for Monad testnet
     server.register("eip155:10143", new ExactEvmScheme());
 
     const middleware = paymentMiddleware(
@@ -150,20 +246,25 @@ app.use(
             {
               scheme: "exact",
               price: "$0.001",
-              network: "eip155:10143", // Monad testnet CAIP-2 identifier
+              network: "eip155:10143",
               payTo: c.env.PAY_TO_ADDRESS as `0x${string}`,
             },
           ],
-          description: "ZK-verified blog articles with BBS+ selective disclosure",
+          description:
+            "ZK-verified blog articles with BBS+ selective disclosure",
           mimeType: "application/json",
           extensions: {
             lemmaAttestation: {
               circuitId: "blog-article-v1",
               schema: "blog-article",
-              // Quality hints — visible before payment, verifiable after.
-              // "See but can't trust → pay → verify with ZK proof."
               hints: {
-                attributes: ["author", "published", "words", "lang", "integrity"],
+                attributes: [
+                  "author",
+                  "published",
+                  "words",
+                  "lang",
+                  "integrity",
+                ],
                 authors: [
                   "did:example:alice",
                   "did:example:bob",
@@ -179,42 +280,34 @@ app.use(
       },
       server,
     );
-    
+
     return middleware(c, next);
   },
 );
 
 // ---------------------------------------------------------------------------
-// Query endpoint
-// Proxies the request body to Lemma's verified-attributes/query API,
-// then simplifies the response: BBS+ selective disclosure envelopes are
-// reduced to plain `disclosed` attribute maps.
+// POST /query — Full query with BBS+ selective disclosure (Advanced)
 // ---------------------------------------------------------------------------
 app.post("/query", async (c) => {
   const apiBase = c.env.LEMMA_API_BASE.replace(/\/$/, "");
   const apiKey = c.env.LEMMA_API_KEY;
 
-  // Parse caller's query params (attribute filters, targets, pagination, etc.)
-  const callerBody = await c.req.json<Record<string, unknown>>().catch(() => ({}));
+  const callerBody = await c.req
+    .json<Record<string, unknown>>()
+    .catch(() => ({}));
 
-  // Merge with disclosure opt-in. If the caller already provided a disclosure
-  // field (with a proof for condition-gated documents), use theirs; otherwise
-  // use the empty opt-in to request unconditioned disclosures.
   const body = {
     ...callerBody,
-    disclosure: (callerBody as Record<string, unknown>).disclosure ?? { proof: "", inputs: [] },
+    disclosure:
+      (callerBody as Record<string, unknown>).disclosure ?? {
+        proof: "",
+        inputs: [],
+      },
   };
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (apiKey) {
-    headers["Authorization"] = `Bearer ${apiKey}`;
-  }
 
   const response = await fetch(`${apiBase}/verified-attributes/query`, {
     method: "POST",
-    headers,
+    headers: lemmaHeaders(apiKey),
     body: JSON.stringify(body),
   });
 
@@ -225,7 +318,6 @@ app.post("/query", async (c) => {
 
   const data = (await response.json()) as LemmaQueryResponse;
 
-  // Strip BBS+ cryptographic envelope — return clean disclosed attributes
   return c.json({
     results: data.results.map(simplifyItem),
     hasMore: data.hasMore,
@@ -233,19 +325,18 @@ app.post("/query", async (c) => {
 });
 
 // ---------------------------------------------------------------------------
-// AI Detection Middleware
+// AI Detection — Demo helper (not a production integration method)
+//
+// Retained for quick 5-minute demos. For production, use the A+B
+// discovery approach: X-Lemma-Attestation header + <link> meta tag.
+// See the "Discovery" section in README.md.
 // ---------------------------------------------------------------------------
 
-/**
- * Detect if the request is from an AI agent.
- * Uses User-Agent, X-Requested-With, and Sec-Purpose headers.
- */
 const detectAI = (c: any): boolean => {
   const userAgent = c.req.header("User-Agent") || "";
   const xRequestedWith = c.req.header("X-Requested-With");
   const secPurpose = c.req.header("Sec-Purpose");
-  
-  // Common AI/LLM User-Agent patterns
+
   const aiPatterns = [
     "OpenAI",
     "Claude",
@@ -261,52 +352,36 @@ const detectAI = (c: any): boolean => {
     "Agent",
     "Crawler",
     "Bot",
-    "Scraper"
+    "Scraper",
   ];
-  
-  const isAIUserAgent = aiPatterns.some(pattern => 
-    userAgent.toLowerCase().includes(pattern.toLowerCase())
+
+  const isAIUserAgent = aiPatterns.some((pattern) =>
+    userAgent.toLowerCase().includes(pattern.toLowerCase()),
   );
-  
-  return isAIUserAgent || 
-         xRequestedWith === "AI" || 
-         secPurpose === "fetch";
+
+  return isAIUserAgent || xRequestedWith === "AI" || secPurpose === "fetch";
 };
 
-// ---------------------------------------------------------------------------
-// AI Redirect Endpoints
-// ---------------------------------------------------------------------------
-
-// AI detection middleware for /ai-content/* paths
 app.use("/ai-content/*", async (c, next) => {
   const isAI = detectAI(c);
-  
+
   if (!isAI) {
-    // Human users get redirected to the original blog
-    // For now, return a message. In production, this would redirect to the actual blog URL.
     return c.json(
-      { 
-        message: "Human detected. Please visit the original blog URL for free access.",
-        redirect: "https://example-blog.com" // Placeholder
-      }, 
-      302
+      {
+        message:
+          "Human detected. Please visit the original blog URL for free access.",
+        redirect: "https://example-blog.com",
+      },
+      302,
     );
   }
-  
-  // AI agents proceed to payment gate
+
   await next();
 });
 
-// Article-specific endpoint for AI access
 app.get("/ai-content/:slug", async (c) => {
   const slug = c.req.param("slug");
-  
-  // This endpoint provides metadata to help AI decide whether to pay
-  // In production, you would:
-  // 1. Look up the article by slug in your database
-  // 2. Map to docHash and other metadata
-  // 3. Return quality hints similar to the 402 response
-  
+
   return c.json({
     slug,
     title: `Example Blog Post: ${slug}`,
@@ -314,41 +389,32 @@ app.get("/ai-content/:slug", async (c) => {
     published: "2026-04-08",
     wordCount: 1500,
     language: "en",
-    message: "AI detected. To access ZK-verified content, make a POST request to /query endpoint.",
+    message:
+      "AI detected. To verify provenance, call GET /verify/:docHash with x402 payment.",
     paymentRequired: true,
-    endpoint: "/query",
-    price: "$0.001 USDC per query",
-    qualityHints: {
-      attributes: ["author", "published", "words", "lang", "integrity"],
-      freshness: "2026-04-08",
-      wordCountRange: [1000, 2000],
-      languages: ["en", "ja"]
-    }
+    endpoints: {
+      verify: "/verify/:docHash (provenance — recommended)",
+      query: "/query (full disclosure — advanced)",
+    },
+    price: "$0.001 USDC per request",
   });
 });
-
-// Helper function to simulate article lookup by slug
-const getArticleMetadataBySlug = (slug: string) => {
-  // In production, this would query a database
-  return {
-    docHash: "0x" + "a1b2c3d4".repeat(8), // Placeholder
-    title: `Blog Post: ${slug}`,
-    author: "did:example:author",
-    publishedAt: "2026-04-08T12:00:00Z"
-  };
-};
 
 // ---------------------------------------------------------------------------
 // Health check
 // ---------------------------------------------------------------------------
-app.get("/", (c) => c.json({ 
-  status: "ok", 
-  service: "lemma-query-worker",
-  endpoints: {
-    query: "POST /query (payment required)",
-    aiContent: "GET /ai-content/:slug (AI detection + redirect)",
-    health: "GET /"
-  }
-}));
+app.get("/", (c) =>
+  c.json({
+    status: "ok",
+    service: "lemma-x402-worker",
+    tagline: "Content is free. Trust costs $0.001.",
+    endpoints: {
+      verify: "GET /verify/:hash (provenance verification — main)",
+      query: "POST /query (BBS+ selective disclosure — advanced)",
+      aiContent: "GET /ai-content/:slug (demo helper)",
+      health: "GET /",
+    },
+  }),
+);
 
 export default app;
