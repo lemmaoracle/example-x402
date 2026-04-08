@@ -7,7 +7,7 @@
     "start": "tsx src/index.ts"
   },
   "dependencies": {
-    "@x402/fetch": "^0.3.0",
+    "@x402/fetch": "^2.9.0",
     "viem": "^2.21.54"
   },
   "devDependencies": {

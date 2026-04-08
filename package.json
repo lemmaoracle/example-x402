@@ -10,8 +10,7 @@
   },
   "dependencies": {
     "@lemmaoracle/sdk": "0.0.15",
-    "@lemmaoracle/spec": "0.0.15",
-    "@lemmaoracle/parser": "0.0.15"
+    "@lemmaoracle/spec": "0.0.15"
   },
   "devDependencies": {
     "tsx": "^4.19.2",

@@ -9,8 +9,8 @@
   },
   "dependencies": {
     "hono": "^4.6.14",
-    "x402-hono": "^0.3.0",
-    "@x402/evm": "^0.3.0",
+    "x402-hono": "^1.1.0",
+    "@x402/evm": "^2.9.0",
     "@lemmaoracle/sdk": "0.0.15",
     "@lemmaoracle/spec": "0.0.15"
   },
