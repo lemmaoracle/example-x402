@@ -24,7 +24,7 @@ Agent ──[$0.001 USDC]──▶ Worker ──[Lemma query]──▶ ZK attrib
 
 - [Node.js](https://nodejs.org/) 20+
 - [pnpm](https://pnpm.io/) 9+
-- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/) (`npm i -g wrangler`)
+- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/) (installed as a project dependency)
 - Monad testnet wallet with test USDC ([faucet](https://testnet.monad.xyz))
 - Cloudflare account (free tier works)
 
@@ -48,8 +48,8 @@ cp .env.example .env
 ### 3. Deploy the worker
 
 ```bash
-wrangler secret put PAY_TO_ADDRESS --cwd packages/worker
-wrangler secret put LEMMA_API_BASE --cwd packages/worker
+npx wrangler secret put PAY_TO_ADDRESS --cwd packages/worker
+npx wrangler secret put LEMMA_API_BASE --cwd packages/worker
 
 pnpm deploy:worker
 # → https://lemma-query.YOUR-SUBDOMAIN.workers.dev

@@ -6,6 +6,6 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 LEMMA_API_BASE = "https://api.lemmaoracle.com"
 
-# Secrets (set via `wrangler secret put`):
+# Secrets (set via `npx wrangler secret put`):
 #   PAY_TO_ADDRESS  — wallet address to receive x402 payments
 #   LEMMA_API_KEY   — Lemma API key (if required)
