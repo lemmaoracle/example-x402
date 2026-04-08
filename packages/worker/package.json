@@ -11,7 +11,8 @@
     "hono": "^4.6.14",
     "x402-hono": "^0.3.0",
     "@x402/evm": "^0.3.0",
-    "@lemmaoracle/lemma": "^0.1.0"
+    "@lemmaoracle/sdk": "0.0.15",
+    "@lemmaoracle/spec": "0.0.15"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241230.0",

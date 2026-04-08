@@ -8,6 +8,11 @@
     "check-balance": "tsx scripts/check-balance.ts",
     "register": "node scripts/register-lemma-artifacts.mjs"
   },
+  "dependencies": {
+    "@lemmaoracle/sdk": "0.0.15",
+    "@lemmaoracle/spec": "0.0.15",
+    "@lemmaoracle/parser": "0.0.15"
+  },
   "devDependencies": {
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"

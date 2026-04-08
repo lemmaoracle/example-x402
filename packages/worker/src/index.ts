@@ -79,7 +79,7 @@ type QueryResponseItem = Readonly<{
  * Extract the disclosed attribute map from a raw SelectiveDisclosure.
  *
  * This is the lightweight equivalent of `disclose.fromSelectiveDisclosure`
- * from @lemmaoracle/lemma — we trust the Lemma API response (the worker
+ * from @lemmaoracle/sdk — we trust the Lemma API response (the worker
  * calls it directly) and skip BBS+ proof re-verification. The caller
  * receives clean key-value attributes without cryptographic envelope data.
  */
