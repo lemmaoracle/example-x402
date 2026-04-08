@@ -2,6 +2,10 @@
  * Lemma × x402 query worker.
  *
  * Gates the Lemma verified-attributes query behind an x402 micropayment.
+ * After payment clears, queries Lemma and returns a simplified response:
+ * BBS+ cryptographic envelope is stripped — the caller receives clean
+ * `disclosed` attributes alongside ZK-verified public attributes.
+ *
  * Developers deploy this worker; Lemma registration and proof submission
  * are handled by Lemma's own infrastructure.
  */
@@ -9,11 +13,105 @@
 import { Hono } from "hono";
 import { paymentMiddleware, Network } from "x402-hono";
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
 type Env = {
   readonly PAY_TO_ADDRESS: string;
   readonly LEMMA_API_BASE: string;
   readonly LEMMA_API_KEY?: string;
 };
+
+/**
+ * Raw SelectiveDisclosure from Lemma API (BBS+ envelope).
+ * See @lemmaoracle/spec SelectiveDisclosure.
+ */
+type RawSelectiveDisclosure = Readonly<{
+  format: string;
+  attributes: Readonly<Record<string, unknown>>;
+  proof: string;
+  publicKey: string;
+  indexes: ReadonlyArray<number>;
+  count: number;
+  header: string;
+  condition?: Readonly<{ circuitId: string }>;
+}>;
+
+/** A single item from Lemma's verified-attributes/query response. */
+type LemmaResponseItem = Readonly<{
+  docHash: string;
+  schema: string;
+  issuerId: string;
+  subjectId: string;
+  chainId?: number;
+  attributes: Readonly<Record<string, unknown>>;
+  proof?: Readonly<Record<string, unknown>>;
+  disclosure?: RawSelectiveDisclosure | null;
+  disclosureError?: "condition_not_met";
+}>;
+
+type LemmaQueryResponse = Readonly<{
+  results: ReadonlyArray<LemmaResponseItem>;
+  hasMore: boolean;
+}>;
+
+/** Simplified response item returned to the caller (no BBS+ crypto data). */
+type QueryResponseItem = Readonly<{
+  docHash: string;
+  schema: string;
+  issuerId: string;
+  subjectId: string;
+  chainId?: number;
+  attributes: Readonly<Record<string, unknown>>;
+  /** Disclosed attributes extracted from BBS+ selective disclosure. */
+  disclosed: Readonly<Record<string, unknown>> | null;
+  /** Present when the disclosure condition was not met. */
+  disclosureError?: "condition_not_met";
+  proof?: Readonly<Record<string, unknown>>;
+}>;
+
+// ---------------------------------------------------------------------------
+// Disclosure extraction
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract the disclosed attribute map from a raw SelectiveDisclosure.
+ *
+ * This is the lightweight equivalent of `disclose.fromSelectiveDisclosure`
+ * from @lemmaoracle/lemma — we trust the Lemma API response (the worker
+ * calls it directly) and skip BBS+ proof re-verification. The caller
+ * receives clean key-value attributes without cryptographic envelope data.
+ */
+const extractDisclosed = (
+  sd: RawSelectiveDisclosure | null | undefined,
+): Readonly<Record<string, unknown>> | null =>
+  sd?.attributes && Object.keys(sd.attributes).length > 0
+    ? sd.attributes
+    : null;
+
+/**
+ * Transform a Lemma response item into a simplified response for the caller.
+ * Strips BBS+ proof/publicKey/indexes/count/header from disclosure.
+ */
+const simplifyItem = (item: LemmaResponseItem): QueryResponseItem => {
+  const base: QueryResponseItem = {
+    docHash: item.docHash,
+    schema: item.schema,
+    issuerId: item.issuerId,
+    subjectId: item.subjectId,
+    ...(item.chainId !== undefined ? { chainId: item.chainId } : {}),
+    attributes: item.attributes,
+    disclosed: extractDisclosed(item.disclosure),
+    ...(item.disclosureError ? { disclosureError: item.disclosureError } : {}),
+    ...(item.proof ? { proof: item.proof } : {}),
+  };
+  return base;
+};
+
+// ---------------------------------------------------------------------------
+// App
+// ---------------------------------------------------------------------------
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -46,8 +144,9 @@ app.use(
 
 // ---------------------------------------------------------------------------
 // Query endpoint
-// Proxies the request body to Lemma's verified-attributes/query API.
-// Automatically opts-in to disclosure access via the disclosure field.
+// Proxies the request body to Lemma's verified-attributes/query API,
+// then simplifies the response: BBS+ selective disclosure envelopes are
+// reduced to plain `disclosed` attribute maps.
 // ---------------------------------------------------------------------------
 app.post("/query", async (c) => {
   const apiBase = c.env.LEMMA_API_BASE.replace(/\/$/, "");
@@ -77,8 +176,18 @@ app.post("/query", async (c) => {
     body: JSON.stringify(body),
   });
 
-  const data = await response.json();
-  return c.json(data, response.status as 200);
+  if (!response.ok) {
+    const error = await response.text();
+    return c.json({ error }, response.status as 500);
+  }
+
+  const data = (await response.json()) as LemmaQueryResponse;
+
+  // Strip BBS+ cryptographic envelope — return clean disclosed attributes
+  return c.json({
+    results: data.results.map(simplifyItem),
+    hasMore: data.hasMore,
+  });
 });
 
 // Health check
