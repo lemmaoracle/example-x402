@@ -263,8 +263,30 @@ packages/
   circuit/     Circom circuit — blog-article-v1 (Poseidon commitment, pre-deployed by Lemma)
   normalize/   Rust WASM — rowDoc → normDoc conversion (pre-deployed by Lemma)
 scripts/
-  check-balance.ts   Check agent wallet USDC balance on Monad testnet
+  register-lemma-artifacts.mjs   Upload WASM/zkey to IPFS + register schema & circuit
+  check-balance.ts               Check agent wallet USDC balance on Monad testnet
 ```
+
+## Register Custom Artifacts
+
+If you modify `packages/normalize` or `packages/circuit`, rebuild and
+re-register the artifacts with Lemma:
+
+```bash
+# 1. Build normalize WASM
+cd packages/normalize && wasm-pack build --target web && cd ../..
+
+# 2. Build circuit (circom + snarkjs)
+cd packages/circuit && ./scripts/build.sh && cd ../..
+
+# 3. Upload to IPFS + register schema & circuit in one step
+cp .env.example .env   # fill in PINATA_API_KEY, PINATA_SECRET_API_KEY, LEMMA_API_KEY
+pnpm register
+```
+
+The script uploads all four artifacts (normalize WASM/JS, circuit WASM/zkey)
+to Pinata IPFS, then registers the `blog-article` schema and `blog-article-v1`
+circuit with the Lemma API. Run once per deployment.
 
 ## How It Works
 
