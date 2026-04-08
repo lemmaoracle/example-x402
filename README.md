@@ -77,13 +77,35 @@ service to deploy.
 
 ### Step 1: Generate a BBS+ key pair (one-time)
 
-```ts
-import { disclose } from "@lemmaoracle/sdk";
+Run the provided npm script to generate a BBS+ key pair:
 
-const { secretKey, publicKey } = await disclose.generateKeyPair();
-// Store secretKey securely (env var, secret manager, etc.)
-// publicKey is shared with Lemma during issuer registration
-console.log("publicKey:", Buffer.from(publicKey).toString("hex"));
+```bash
+pnpm generate-keypair
+```
+
+The script will output:
+- `secretKey` (hex): Store securely as an environment variable (`LEMMA_BBS_SECRET_KEY`)
+- `publicKey` (hex): Share with Lemma during issuer registration
+
+Example output:
+```
+Generating BBS+ key pair for Lemma selective disclosure...
+
+=== IMPORTANT: Save these keys securely ===
+
+SECRET KEY (hex):
+0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+
+PUBLIC KEY (hex):
+fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
+
+=== Usage Instructions ===
+1. Store the SECRET KEY as an environment variable (e.g., LEMMA_BBS_SECRET_KEY)
+2. Share the PUBLIC KEY with Lemma during issuer registration
+3. Never commit the secret key to version control!
+
+You can set the secret key as an environment variable:
+export LEMMA_BBS_SECRET_KEY="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 ```
 
 Save `secretKey` as a CI secret (`LEMMA_BBS_SECRET_KEY`).
@@ -265,6 +287,7 @@ packages/
 scripts/
   register-lemma-artifacts.mjs   Upload WASM/zkey to IPFS + register schema & circuit
   check-balance.ts               Check agent wallet USDC balance on Monad testnet
+  generate-bbs-keypair.ts        Generate BBS+ key pair for selective disclosure
 ```
 
 ## Register Custom Artifacts

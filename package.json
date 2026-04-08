@@ -6,11 +6,12 @@
     "deploy:worker": "pnpm --filter @example-x402/worker deploy",
     "agent": "pnpm --filter @example-x402/agent start",
     "check-balance": "tsx scripts/check-balance.ts",
-    "register": "node scripts/register-lemma-artifacts.mjs"
+    "register": "node scripts/register-lemma-artifacts.mjs",
+    "generate-keypair": "tsx scripts/generate-bbs-keypair.ts"
   },
   "dependencies": {
-    "@lemmaoracle/sdk": "0.0.15",
-    "@lemmaoracle/spec": "0.0.15"
+    "@lemmaoracle/sdk": "0.0.16",
+    "@lemmaoracle/spec": "0.0.16"
   },
   "devDependencies": {
     "tsx": "^4.19.2",

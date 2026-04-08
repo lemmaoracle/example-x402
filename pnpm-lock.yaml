@@ -9,11 +9,11 @@ importers:
   .:
     dependencies:
       '@lemmaoracle/sdk':
-        specifier: 0.0.15
-        version: 0.0.15
+        specifier: 0.0.16
+        version: 0.0.16
       '@lemmaoracle/spec':
-        specifier: 0.0.15
-        version: 0.0.15
+        specifier: 0.0.16
+        version: 0.0.16
     devDependencies:
       tsx:
         specifier: ^4.19.2
@@ -55,11 +55,11 @@ importers:
   packages/worker:
     dependencies:
       '@lemmaoracle/sdk':
-        specifier: 0.0.15
-        version: 0.0.15
+        specifier: 0.0.16
+        version: 0.0.16
       '@lemmaoracle/spec':
-        specifier: 0.0.15
-        version: 0.0.15
+        specifier: 0.0.16
+        version: 0.0.16
       '@x402/evm':
         specifier: ^2.9.0
         version: 2.9.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)
@@ -608,11 +608,11 @@ packages:
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
 
-  '@lemmaoracle/sdk@0.0.15':
-    resolution: {integrity: sha512-EwhMXX2jBWx++FIetpqrSDatnk5qYUfWQyHxYmRVCIYxrTSzok9gKlLbsMehoAr60GZdHREsmLhHc/d5Y66/Ig==}
+  '@lemmaoracle/sdk@0.0.16':
+    resolution: {integrity: sha512-cKz4OlnxAitmX3TtxHPciRCv90kQfHDVUecWddTe34JQ+Mw1qSMyknHFrShiy1x3vFNq9Yi717Bwp+Ot7tZUGg==}
 
-  '@lemmaoracle/spec@0.0.15':
-    resolution: {integrity: sha512-wgSi52SyQqMNCkNb4NGRwXvnYxYHWPM9L2itPXLTmWHzJiugql4Zg9k/X0iDvql5joiXLJVrwke1t2Asv1VHNA==}
+  '@lemmaoracle/spec@0.0.16':
+    resolution: {integrity: sha512-q1ozzzr+35TeGDZU0pWUYWDHV9q8O4WNSBe6o1aoc3awFIQQix7U4m4GMZCrWh8lPc9RiPj8D7R0GPKH/m3IBQ==}
 
   '@lit-labs/ssr-dom-shim@1.5.1':
     resolution: {integrity: sha512-Aou5UdlSpr5whQe8AA/bZG0jMj96CoJIWbGfZ91qieWu5AWUMKw8VR/pAkQkJYvBNhmCcWnZlyyk5oze8JIqYA==}
@@ -3196,10 +3196,10 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@lemmaoracle/sdk@0.0.15':
+  '@lemmaoracle/sdk@0.0.16':
     dependencies:
       '@docknetwork/crypto-wasm': 0.35.0
-      '@lemmaoracle/spec': 0.0.15
+      '@lemmaoracle/spec': 0.0.16
       '@noble/ciphers': 1.3.0
       '@noble/curves': 1.9.7
       '@noble/hashes': 1.8.0
@@ -3207,7 +3207,7 @@ snapshots:
       ramda: 0.30.1
       snarkjs: 0.7.6
 
-  '@lemmaoracle/spec@0.0.15': {}
+  '@lemmaoracle/spec@0.0.16': {}
 
   '@lit-labs/ssr-dom-shim@1.5.1': {}
 
