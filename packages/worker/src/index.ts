@@ -1,23 +1,27 @@
 /**
  * Lemma × x402 provenance verification worker.
  *
- * Main endpoint: GET /verify/:hash
- *   — x402 gated ($0.001 USDC). After payment, queries Lemma for
- *   verified attributes (author, published, integrity, words, lang)
- *   and proof status for the given document hash.
+ * Reference implementation of the x402 protocol flow for resource servers.
+ * This worker demonstrates the explicit verify → work → settle pattern
+ * that any x402-enabled server must implement.
  *
- * Advanced: POST /query
- *   — x402 gated. Full query API with BBS+ selective disclosure.
- *   For agents that need content access (title/body) in addition
- *   to provenance verification.
+ * Flow:
+ *   1. Client sends request with PAYMENT-SIGNATURE header (Base64 PaymentPayload)
+ *   2. Worker calls facilitator POST /verify — lightweight pre-check
+ *   3. Worker generates the resource (calls Lemma API)
+ *   4. Worker calls facilitator POST /settle — broadcasts tx, returns proof
+ *   5. The proof from /settle is used as disclosure in the Lemma query
+ *   6. Worker returns 200 + PAYMENT-RESPONSE header with settlement details
+ *
+ * Endpoints:
+ *   GET  /verify/:hash  — Provenance verification ($0.001 USDC)
+ *   POST /query         — Full BBS+ selective disclosure ($0.001 USDC)
+ *   GET  /              — Health check
  *
  * Content is free. Trust costs $0.001.
  */
 
 import { Hono } from "hono";
-import { paymentMiddleware, x402ResourceServer } from "@x402/hono";
-import { ExactEvmScheme } from "@x402/evm/exact/server";
-import { HTTPFacilitatorClient } from "@x402/core/server";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -25,8 +29,40 @@ import { HTTPFacilitatorClient } from "@x402/core/server";
 
 type Env = {
   readonly PAY_TO_ADDRESS: string;
+  readonly FACILITATOR_URL: string;
   readonly LEMMA_API_BASE: string;
   readonly LEMMA_API_KEY?: string;
+};
+
+/** Payment scheme accepted by this resource server. */
+type PaymentAccept = {
+  scheme: string;
+  price: string;
+  network: string;
+  payTo: string;
+};
+
+/** Payment requirements returned in the 402 response. */
+type PaymentRequirements = {
+  accepts: PaymentAccept[];
+  description: string;
+  mimeType: string;
+  extensions?: Record<string, unknown>;
+};
+
+/** Facilitator /verify response. */
+type VerifyResponse = {
+  isValid: boolean;
+  invalidReason: string | null;
+};
+
+/** Facilitator /settle response. */
+type SettleResponse = {
+  success: boolean;
+  txHash: string;
+  proof: string;
+  inputs?: unknown[];
+  [key: string]: unknown;
 };
 
 /** Raw SelectiveDisclosure from Lemma API (BBS+ envelope). */
@@ -67,9 +103,7 @@ type QueryResponseItem = Readonly<{
   subjectId: string;
   chainId?: number;
   attributes: Readonly<Record<string, unknown>>;
-  /** Disclosed attributes extracted from BBS+ selective disclosure. */
   disclosed: Readonly<Record<string, unknown>> | null;
-  /** Present when the disclosure condition was not met. */
   disclosureError?: "condition_not_met";
   proof?: Readonly<Record<string, unknown>>;
 }>;
@@ -84,6 +118,59 @@ type VerifyResponseItem = Readonly<{
     circuitId?: string;
   };
 }>;
+
+// ---------------------------------------------------------------------------
+// Payment requirements for each endpoint
+// ---------------------------------------------------------------------------
+
+const verifyPaymentRequirements = (payTo: string): PaymentRequirements => ({
+  accepts: [
+    {
+      scheme: "exact",
+      price: "$0.001",
+      network: "eip155:84532",
+      payTo,
+    },
+  ],
+  description: "Verified provenance attributes for a Lemma-attested document",
+  mimeType: "application/json",
+  extensions: {
+    lemmaAttestation: {
+      schema: "blog-article",
+      verifiable: ["author", "published", "integrity", "words", "lang"],
+    },
+  },
+});
+
+const queryPaymentRequirements = (payTo: string): PaymentRequirements => ({
+  accepts: [
+    {
+      scheme: "exact",
+      price: "$0.001",
+      network: "eip155:84532",
+      payTo,
+    },
+  ],
+  description: "ZK-verified blog articles with BBS+ selective disclosure",
+  mimeType: "application/json",
+  extensions: {
+    lemmaAttestation: {
+      circuitId: "blog-article-v1",
+      schema: "blog-article",
+      hints: {
+        attributes: ["author", "published", "words", "lang", "integrity"],
+        authors: [
+          "did:example:alice",
+          "did:example:bob",
+          "did:example:charlie",
+        ],
+        freshness: "2026-04-08",
+        langs: ["en", "ja"],
+        count: 3,
+      },
+    },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -127,76 +214,178 @@ const lemmaHeaders = (apiKey?: string): Record<string, string> => ({
 });
 
 // ---------------------------------------------------------------------------
+// x402 facilitator interaction helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract the payment payload from the PAYMENT-SIGNATURE header.
+ * Returns the decoded payload string, or null if the header is missing.
+ */
+function extractPaymentPayload(
+  header: string | undefined,
+): string | null {
+  if (!header) return null;
+  try {
+    return atob(header);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Call the facilitator's POST /verify endpoint.
+ *
+ * Sends the client's payment payload along with this server's payment
+ * requirements. The facilitator validates the signature, amount, and
+ * balance without broadcasting any transaction.
+ */
+async function facilitatorVerify(
+  facilitatorUrl: string,
+  paymentPayload: string,
+  paymentRequirements: PaymentRequirements,
+): Promise<VerifyResponse> {
+  const res = await fetch(`${facilitatorUrl}/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      payload: paymentPayload,
+      details: paymentRequirements,
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Facilitator /verify failed (${res.status}): ${text}`);
+  }
+
+  return res.json() as Promise<VerifyResponse>;
+}
+
+/**
+ * Call the facilitator's POST /settle endpoint.
+ *
+ * Submits the payment transaction to the blockchain. This call blocks
+ * while the facilitator waits for on-chain confirmation (typically
+ * seconds to tens of seconds).
+ *
+ * Returns the settlement result including txHash and ZK proof.
+ */
+async function facilitatorSettle(
+  facilitatorUrl: string,
+  paymentPayload: string,
+  paymentRequirements: PaymentRequirements,
+): Promise<SettleResponse> {
+  const res = await fetch(`${facilitatorUrl}/settle`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      payload: paymentPayload,
+      details: paymentRequirements,
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Facilitator /settle failed (${res.status}): ${text}`);
+  }
+
+  return res.json() as Promise<SettleResponse>;
+}
+
+/**
+ * Build the Base64-encoded PAYMENT-RESPONSE header value from settle result.
+ */
+function buildPaymentResponseHeader(settleResult: SettleResponse): string {
+  return btoa(JSON.stringify(settleResult));
+}
+
+// ---------------------------------------------------------------------------
 // App
 // ---------------------------------------------------------------------------
 
 const app = new Hono<{ Bindings: Env }>();
 
 // ---------------------------------------------------------------------------
-// x402 payment middleware — GET /verify/:hash
-//
-// Main endpoint. Returns ZK-verified provenance attributes for a document.
-// $0.001 USDC per verification on Base Sepolia.
-//
-// 402 response includes lemmaAttestation hints:
-//   { schema, verifiable }
-// ---------------------------------------------------------------------------
-app.use(
-  "/verify/:hash",
-  async (c, next) => {
-    const facilitatorClient = new HTTPFacilitatorClient({
-      url: "https://x402.org/facilitator",
-    });
-
-    const server = new x402ResourceServer(facilitatorClient);
-    server.register("eip155:84532", new ExactEvmScheme());
-
-    const middleware = paymentMiddleware(
-      {
-        "GET /verify/:hash": {
-          accepts: [
-            {
-              scheme: "exact",
-              price: "$0.001",
-              network: "eip155:84532",
-              payTo: c.env.PAY_TO_ADDRESS as `0x${string}`,
-            },
-          ],
-          description:
-            "Verified provenance attributes for a Lemma-attested document",
-          mimeType: "application/json",
-          extensions: {
-            lemmaAttestation: {
-              schema: "blog-article",
-              verifiable: [
-                "author",
-                "published",
-                "integrity",
-                "words",
-                "lang",
-              ],
-            },
-          },
-        },
-      },
-      server,
-    );
-
-    return middleware(c, next);
-  },
-);
-
-// ---------------------------------------------------------------------------
 // GET /verify/:hash — Provenance verification endpoint
 //
-// After x402 payment clears, queries Lemma for the document matching
-// the given hash and returns verified attributes + proof status.
-//
-// The hash can be a docHash (0x-prefixed). The agent can additionally
-// compare its locally computed SHA-256 of the content against the
-// returned `integrity` attribute to confirm content has not been tampered.
+// x402 flow:
+//   1. No PAYMENT-SIGNATURE header → 402 with payment requirements
+//   2. PAYMENT-SIGNATURE present → verify with facilitator
+//   3. If valid → query Lemma for document provenance
+//   4. Settle payment with facilitator → get txHash + proof
+//   5. Return provenance data + PAYMENT-RESPONSE header
 // ---------------------------------------------------------------------------
 app.get("/verify/:hash", async (c) => {
+  const facilitatorUrl = c.env.FACILITATOR_URL.replace(/\/$/, "");
+  const payTo = c.env.PAY_TO_ADDRESS;
+  const requirements = verifyPaymentRequirements(payTo);
+
+  // Step 1: Check for payment — return 402 if no payment signature
+  const paymentSignature = c.req.header("PAYMENT-SIGNATURE");
+  const paymentPayload = extractPaymentPayload(paymentSignature);
+
+  if (!paymentPayload) {
+    return c.json(
+      {
+        error: "payment_required",
+        message: "Content is free. Trust costs $0.001.",
+        paymentRequirements: requirements,
+      },
+      402,
+      {
+        "PAYMENT-REQUIRED": btoa(JSON.stringify(requirements)),
+      },
+    );
+  }
+
+  // Step 2: Verify payment with facilitator (lightweight pre-check)
+  let verification: VerifyResponse;
+  try {
+    verification = await facilitatorVerify(
+      facilitatorUrl,
+      paymentPayload,
+      requirements,
+    );
+  } catch (err) {
+    return c.json(
+      { error: "verification_failed", message: String(err) },
+      502,
+    );
+  }
+
+  if (!verification.isValid) {
+    return c.json(
+      {
+        error: "payment_invalid",
+        reason: verification.invalidReason,
+        paymentRequirements: requirements,
+      },
+      402,
+      {
+        "PAYMENT-REQUIRED": btoa(JSON.stringify(requirements)),
+      },
+    );
+  }
+
+  // Step 3: Settle payment with facilitator (broadcasts tx, returns proof)
+  // Settlement blocks while waiting for on-chain confirmation.
+  let settlement: SettleResponse;
+  try {
+    settlement = await facilitatorSettle(
+      facilitatorUrl,
+      paymentPayload,
+      requirements,
+    );
+  } catch (err) {
+    return c.json(
+      { error: "settlement_failed", message: String(err) },
+      502,
+    );
+  }
+
+  // Step 4: Query Lemma with the settlement proof as disclosure
+  // The proof from /settle is the critical link — it proves on-chain payment
+  // occurred and is attached as the disclosure credential for the Lemma query.
   const hash = c.req.param("hash");
   const apiBase = c.env.LEMMA_API_BASE.replace(/\/$/, "");
   const apiKey = c.env.LEMMA_API_KEY;
@@ -204,7 +393,13 @@ app.get("/verify/:hash", async (c) => {
   const response = await fetch(`${apiBase}/verified-attributes/query`, {
     method: "POST",
     headers: lemmaHeaders(apiKey),
-    body: JSON.stringify({ docHash: hash }),
+    body: JSON.stringify({
+      docHash: hash,
+      disclosure: {
+        proof: settlement.proof,
+        inputs: settlement.inputs ?? [],
+      },
+    }),
   });
 
   if (!response.ok) {
@@ -218,77 +413,88 @@ app.get("/verify/:hash", async (c) => {
     return c.json({ error: "document_not_found", docHash: hash }, 404);
   }
 
-  return c.json({
-    results: data.results.map(toVerifyItem),
-  });
+  // Step 5: Return provenance data with PAYMENT-RESPONSE header
+  return c.json(
+    { results: data.results.map(toVerifyItem) },
+    200,
+    { "PAYMENT-RESPONSE": buildPaymentResponseHeader(settlement) },
+  );
 });
 
 // ---------------------------------------------------------------------------
-// x402 payment middleware — POST /query (Advanced)
+// POST /query — Full query with BBS+ selective disclosure
 //
-// Full query endpoint with BBS+ selective disclosure. For agents that
-// need disclosed content (title, body) alongside verified attributes.
-// ---------------------------------------------------------------------------
-app.use(
-  "/query",
-  async (c, next) => {
-    const facilitatorClient = new HTTPFacilitatorClient({
-      url: "https://x402.org/facilitator",
-    });
-
-    const server = new x402ResourceServer(facilitatorClient);
-    server.register("eip155:84532", new ExactEvmScheme());
-
-    const middleware = paymentMiddleware(
-      {
-        "POST /query": {
-          accepts: [
-            {
-              scheme: "exact",
-              price: "$0.001",
-              network: "eip155:84532",
-              payTo: c.env.PAY_TO_ADDRESS as `0x${string}`,
-            },
-          ],
-          description:
-            "ZK-verified blog articles with BBS+ selective disclosure",
-          mimeType: "application/json",
-          extensions: {
-            lemmaAttestation: {
-              circuitId: "blog-article-v1",
-              schema: "blog-article",
-              hints: {
-                attributes: [
-                  "author",
-                  "published",
-                  "words",
-                  "lang",
-                  "integrity",
-                ],
-                authors: [
-                  "did:example:alice",
-                  "did:example:bob",
-                  "did:example:charlie",
-                ],
-                freshness: "2026-04-08",
-                langs: ["en", "ja"],
-                count: 3,
-              },
-            },
-          },
-        },
-      },
-      server,
-    );
-
-    return middleware(c, next);
-  },
-);
-
-// ---------------------------------------------------------------------------
-// POST /query — Full query with BBS+ selective disclosure (Advanced)
+// Same x402 flow as /verify, but accepts a richer query body and returns
+// disclosed content (title, body) alongside verified attributes.
 // ---------------------------------------------------------------------------
 app.post("/query", async (c) => {
+  const facilitatorUrl = c.env.FACILITATOR_URL.replace(/\/$/, "");
+  const payTo = c.env.PAY_TO_ADDRESS;
+  const requirements = queryPaymentRequirements(payTo);
+
+  // Step 1: Check for payment
+  const paymentSignature = c.req.header("PAYMENT-SIGNATURE");
+  const paymentPayload = extractPaymentPayload(paymentSignature);
+
+  if (!paymentPayload) {
+    return c.json(
+      {
+        error: "payment_required",
+        message: "Content is free. Trust costs $0.001.",
+        paymentRequirements: requirements,
+      },
+      402,
+      {
+        "PAYMENT-REQUIRED": btoa(JSON.stringify(requirements)),
+      },
+    );
+  }
+
+  // Step 2: Verify payment with facilitator
+  let verification: VerifyResponse;
+  try {
+    verification = await facilitatorVerify(
+      facilitatorUrl,
+      paymentPayload,
+      requirements,
+    );
+  } catch (err) {
+    return c.json(
+      { error: "verification_failed", message: String(err) },
+      502,
+    );
+  }
+
+  if (!verification.isValid) {
+    return c.json(
+      {
+        error: "payment_invalid",
+        reason: verification.invalidReason,
+        paymentRequirements: requirements,
+      },
+      402,
+      {
+        "PAYMENT-REQUIRED": btoa(JSON.stringify(requirements)),
+      },
+    );
+  }
+
+  // Step 3: Settle payment with facilitator
+  let settlement: SettleResponse;
+  try {
+    settlement = await facilitatorSettle(
+      facilitatorUrl,
+      paymentPayload,
+      requirements,
+    );
+  } catch (err) {
+    return c.json(
+      { error: "settlement_failed", message: String(err) },
+      502,
+    );
+  }
+
+  // Step 4: Query Lemma with settlement proof as disclosure
   const apiBase = c.env.LEMMA_API_BASE.replace(/\/$/, "");
   const apiKey = c.env.LEMMA_API_KEY;
 
@@ -296,13 +502,14 @@ app.post("/query", async (c) => {
     .json<Record<string, unknown>>()
     .catch(() => ({}));
 
+  // Merge the caller's query params with the settlement proof disclosure.
+  // The proof from /settle replaces any client-provided disclosure.
   const body = {
     ...callerBody,
-    disclosure:
-      (callerBody as Record<string, unknown>).disclosure ?? {
-        proof: "",
-        inputs: [],
-      },
+    disclosure: {
+      proof: settlement.proof,
+      inputs: settlement.inputs ?? [],
+    },
   };
 
   const response = await fetch(`${apiBase}/verified-attributes/query`, {
@@ -318,86 +525,15 @@ app.post("/query", async (c) => {
 
   const data = (await response.json()) as LemmaQueryResponse;
 
-  return c.json({
-    results: data.results.map(simplifyItem),
-    hasMore: data.hasMore,
-  });
-});
-
-// ---------------------------------------------------------------------------
-// AI Detection — Demo helper (not a production integration method)
-//
-// Retained for quick 5-minute demos. For production, use the A+B
-// discovery approach: X-Lemma-Attestation header + <link> meta tag.
-// See the "Discovery" section in README.md.
-// ---------------------------------------------------------------------------
-
-const detectAI = (c: any): boolean => {
-  const userAgent = c.req.header("User-Agent") || "";
-  const xRequestedWith = c.req.header("X-Requested-With");
-  const secPurpose = c.req.header("Sec-Purpose");
-
-  const aiPatterns = [
-    "OpenAI",
-    "Claude",
-    "GPT",
-    "ChatGPT",
-    "Bard",
-    "Gemini",
-    "Cohere",
-    "Anthropic",
-    "AI",
-    "LLM",
-    "Language-Model",
-    "Agent",
-    "Crawler",
-    "Bot",
-    "Scraper",
-  ];
-
-  const isAIUserAgent = aiPatterns.some((pattern) =>
-    userAgent.toLowerCase().includes(pattern.toLowerCase()),
-  );
-
-  return isAIUserAgent || xRequestedWith === "AI" || secPurpose === "fetch";
-};
-
-app.use("/ai-content/*", async (c, next) => {
-  const isAI = detectAI(c);
-
-  if (!isAI) {
-    return c.json(
-      {
-        message:
-          "Human detected. Please visit the original blog URL for free access.",
-        redirect: "https://example-blog.com",
-      },
-      302,
-    );
-  }
-
-  await next();
-});
-
-app.get("/ai-content/:slug", async (c) => {
-  const slug = c.req.param("slug");
-
-  return c.json({
-    slug,
-    title: `Example Blog Post: ${slug}`,
-    author: "did:example:author",
-    published: "2026-04-08",
-    wordCount: 1500,
-    language: "en",
-    message:
-      "AI detected. To verify provenance, call GET /verify/:docHash with x402 payment.",
-    paymentRequired: true,
-    endpoints: {
-      verify: "/verify/:docHash (provenance — recommended)",
-      query: "/query (full disclosure — advanced)",
+  // Step 5: Return query results with PAYMENT-RESPONSE header
+  return c.json(
+    {
+      results: data.results.map(simplifyItem),
+      hasMore: data.hasMore,
     },
-    price: "$0.001 USDC per request",
-  });
+    200,
+    { "PAYMENT-RESPONSE": buildPaymentResponseHeader(settlement) },
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -411,7 +547,6 @@ app.get("/", (c) =>
     endpoints: {
       verify: "GET /verify/:hash (provenance verification — main)",
       query: "POST /query (BBS+ selective disclosure — advanced)",
-      aiContent: "GET /ai-content/:slug (demo helper)",
       health: "GET /",
     },
   }),
