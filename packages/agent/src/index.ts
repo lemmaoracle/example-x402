@@ -58,7 +58,7 @@ const signer = {
   address: account.address,
   signTypedData: account.signTypedData.bind(account),
 };
-client.register("eip155:10143", new ExactEvmScheme(signer));
+client.register("eip155:84532", new ExactEvmScheme(signer));
 
 const x402Fetch = wrapFetchWithPayment(fetch, client);
 

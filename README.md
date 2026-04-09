@@ -1,6 +1,6 @@
 # example-x402
 
-**Content is free. Trust costs $0.001.** — [Lemma](https://lemmaoracle.com) × [x402](https://x402.org) on Monad testnet.
+**Content is free. Trust costs $0.001.** — [Lemma](https://lemmaoracle.com) × [x402](https://x402.org) on Base Sepolia.
 
 An AI agent fetches a blog article for free, discovers that a Lemma attestation
 is available, then pays $0.001 USDC to verify its provenance — author, publication
@@ -28,7 +28,7 @@ Blog ──[200 OK]──▶ Agent
 - [Node.js](https://nodejs.org/) 20+
 - [pnpm](https://pnpm.io/) 9+
 - [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/) (installed as a project dependency)
-- Monad testnet wallet with test USDC ([faucet](https://testnet.monad.xyz))
+- Base Sepolia wallet with test USDC ([faucet](https://docs.base.org/tools/testnet-faucet/))
 - Cloudflare account (free tier works)
 
 ## Quick Start
@@ -411,7 +411,7 @@ packages/
 scripts/
   generate-snippet.ts           Generate X-Lemma-Attestation header + <link> tag
   register-lemma-artifacts.mjs  Upload WASM/zkey to IPFS + register schema & circuit
-  check-balance.ts              Check agent wallet USDC balance on Monad testnet
+  check-balance.ts              Check agent wallet USDC balance on Base Sepolia
   generate-bbs-keypair.ts       Generate BBS+ key pair for selective disclosure
   register-with-full-content.ts Register articles with full content support
   ai-redirect.js                JavaScript for AI redirection (demo helper)
@@ -449,5 +449,5 @@ pnpm register
 
 ## Network
 
-Monad testnet (chainId `10143`) — fast, EVM-compatible, ideal for micropayment demos.
-RPC: `https://testnet-rpc.monad.xyz`
+Base Sepolia testnet (chainId `84532`) — Base's public testnet, EVM-compatible, ideal for micropayment demos.
+RPC: `https://sepolia.base.org`

@@ -136,7 +136,7 @@ const app = new Hono<{ Bindings: Env }>();
 // x402 payment middleware — GET /verify/:hash
 //
 // Main endpoint. Returns ZK-verified provenance attributes for a document.
-// $0.001 USDC per verification on Monad testnet.
+// $0.001 USDC per verification on Base Sepolia.
 //
 // 402 response includes lemmaAttestation hints:
 //   { schema, verifiable }
@@ -149,7 +149,7 @@ app.use(
     });
 
     const server = new x402ResourceServer(facilitatorClient);
-    server.register("eip155:10143", new ExactEvmScheme());
+    server.register("eip155:84532", new ExactEvmScheme());
 
     const middleware = paymentMiddleware(
       {
@@ -158,7 +158,7 @@ app.use(
             {
               scheme: "exact",
               price: "$0.001",
-              network: "eip155:10143",
+              network: "eip155:84532",
               payTo: c.env.PAY_TO_ADDRESS as `0x${string}`,
             },
           ],
@@ -237,7 +237,7 @@ app.use(
     });
 
     const server = new x402ResourceServer(facilitatorClient);
-    server.register("eip155:10143", new ExactEvmScheme());
+    server.register("eip155:84532", new ExactEvmScheme());
 
     const middleware = paymentMiddleware(
       {
@@ -246,7 +246,7 @@ app.use(
             {
               scheme: "exact",
               price: "$0.001",
-              network: "eip155:10143",
+              network: "eip155:84532",
               payTo: c.env.PAY_TO_ADDRESS as `0x${string}`,
             },
           ],

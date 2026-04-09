@@ -31,7 +31,7 @@ dotenv.config({ path: path.join(__dirname, "..", ".env") });
 // ── Config ─────────────────────────────────────────────────────────
 
 const PINATA_API_URL = "https://api.pinata.cloud/pinning/pinFileToIPFS";
-const CHAIN_ID = 10143; // Monad testnet
+const CHAIN_ID = 84532; // Base Sepolia
 
 const client = create({
   apiBase: process.env.LEMMA_API_BASE ?? "https://workers.lemma.workers.dev",
