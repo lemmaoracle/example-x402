@@ -2,7 +2,7 @@
 
 Circom circuit for blog article attribute commitment.
 
-## `blog-article-v1`
+## Circuit: `circuit.circom` (formerly `blog-article-v1`)
 
 A commitment-opening circuit proving knowledge of 5 article attributes:
 
@@ -22,9 +22,35 @@ of all private inputs.
 
 ```bash
 pnpm install
-pnpm build    # compile → build/blog-article-v1.{r1cs,wasm,sym}
-pnpm setup    # trusted setup → build/blog-article-v1.zkey
-pnpm export-vkey  # → build/verification_key.json
+pnpm build    # compile → setup → export verifier
+```
+
+The build script (`scripts/build.sh`) will:
+1. Compile the circuit to R1CS, WASM, and sym files
+2. Download Powers of Tau (14)
+3. Perform Groth16 trusted setup
+4. Export verification key (`build/verification_key.json`)
+5. Export Solidity verifier contract (`build/CircuitVerifier.sol`)
+
+## Deployment
+
+```bash
+# Set up environment variables (copy root .env.example to .env)
+cd ../..  # Go to example-x402 root
+cp .env.example .env
+# Edit .env with your private key and RPC URLs
+
+# Deploy to local node (from root)
+pnpm -F circuit forge:deploy
+
+# Deploy to Sepolia testnet (from root)
+pnpm -F circuit forge:deploy:sepolia
+
+# Deploy to Base Sepolia testnet (from root)
+pnpm -F circuit forge:deploy:baseSepolia
+
+# Deploy to Base mainnet (from root)
+pnpm -F circuit forge:deploy:base
 ```
 
 > **Note:** The example ships with pre-compiled artifacts deployed by Lemma.

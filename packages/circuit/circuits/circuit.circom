@@ -1,6 +1,6 @@
 pragma circom 2.1.0;
 
-include "../node_modules/circomlib/circuits/poseidon.circom";
+include "circomlib/circuits/poseidon.circom";
 
 /**
  * BlogArticleV1 — commitment-opening circuit for blog article attributes.

@@ -1,0 +1,9 @@
+# Foundry
+/out/
+/cache_forge/
+/cache/
+/lib/
+
+# Circuit builds
+/build/
+node_modules/

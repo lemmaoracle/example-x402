@@ -3,11 +3,20 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "build": "circom circuits/blog-article-v1.circom --r1cs --wasm --sym -o build",
-    "setup": "snarkjs groth16 setup build/blog-article-v1.r1cs pot14_final.ptau build/blog-article-v1.zkey",
-    "export-vkey": "snarkjs zkey export verificationkey build/blog-article-v1.zkey build/verification_key.json"
+    "build": "bash scripts/build.sh",
+    "test": "echo 'Add test script if needed'",
+    "forge:build": "forge build",
+    "forge:test": "forge test -vvv",
+    "forge:clean": "forge clean",
+    "forge:deploy": "forge script scripts/Deploy.s.sol --broadcast",
+    "forge:deploy:sepolia": "forge script scripts/Deploy.s.sol --rpc-url sepolia --broadcast --verify",
+    "forge:deploy:mainnet": "forge script scripts/Deploy.s.sol --rpc-url mainnet --broadcast --verify",
+    "forge:deploy:baseSepolia": "forge script scripts/Deploy.s.sol --rpc-url base_sepolia --broadcast --verify",
+    "forge:deploy:base": "forge script scripts/Deploy.s.sol --rpc-url base --broadcast --verify",
+    "forge:node": "anvil"
   },
   "devDependencies": {
+    "circom2": "^0.2.22",
     "circomlib": "^2.0.5",
     "snarkjs": "^0.7.5"
   }
