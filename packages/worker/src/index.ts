@@ -128,7 +128,7 @@ const verifyPaymentRequirements = (payTo: string): PaymentRequirements => ({
     {
       scheme: "exact",
       price: "$0.001",
-      network: "eip155:84532",
+      network: "eip155:10143",
       payTo,
     },
   ],
@@ -147,7 +147,7 @@ const queryPaymentRequirements = (payTo: string): PaymentRequirements => ({
     {
       scheme: "exact",
       price: "$0.001",
-      network: "eip155:84532",
+      network: "eip155:10143",
       payTo,
     },
   ],

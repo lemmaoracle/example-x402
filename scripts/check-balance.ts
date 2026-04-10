@@ -1,16 +1,29 @@
 /**
- * Check the agent wallet's USDC balance on Base Sepolia.
+ * Check the agent wallet's USDC balance on Monad Testnet.
  *
  * Usage:
  *   AGENT_PRIVATE_KEY=0x... pnpm check-balance
  */
 
-import { createPublicClient, http, erc20Abi } from "viem";
+import { createPublicClient, http, erc20Abi, defineChain } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { baseSepolia } from "viem/chains";
 
-// USDC on Base Sepolia — update if the address changes
-const USDC_ADDRESS = "0x61fde2eb13d9ed692eda7b403c9ba35b74fd590c";
+// Monad Testnet chain definition
+const monadTestnet = defineChain({
+  id: 10143,
+  name: "Monad Testnet",
+  nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 },
+  rpcUrls: {
+    default: { http: ["https://testnet-rpc.monad.xyz"] },
+  },
+  blockExplorers: {
+    default: { name: "Monad Explorer", url: "https://testnet.monadexplorer.com" },
+  },
+  testnet: true,
+});
+
+// USDC on Monad Testnet — update if the address changes
+const USDC_ADDRESS = "0x534b2f3A21130d7a60830c2Df862319e593943A3";
 
 const AGENT_PRIVATE_KEY = process.env.AGENT_PRIVATE_KEY as `0x${string}` | undefined;
 
@@ -21,8 +34,8 @@ if (!AGENT_PRIVATE_KEY) {
 
 const account = privateKeyToAccount(AGENT_PRIVATE_KEY);
 const client = createPublicClient({
-  chain: baseSepolia,
-  transport: http("https://sepolia.base.org"),
+  chain: monadTestnet,
+  transport: http("https://testnet-rpc.monad.xyz"),
 });
 
 async function main() {
@@ -44,7 +57,7 @@ async function main() {
   const humanBalance = Number(balance) / Math.pow(10, decimals);
 
   console.log(`Wallet: ${account.address}`);
-  console.log(`USDC balance (Base Sepolia): ${humanBalance.toFixed(6)} USDC`);
+  console.log(`USDC balance (Monad Testnet): ${humanBalance.toFixed(6)} USDC`);
 }
 
 main().catch(console.error);

@@ -46,11 +46,8 @@ pnpm -F circuit forge:deploy
 # Deploy to Sepolia testnet (from root)
 pnpm -F circuit forge:deploy:sepolia
 
-# Deploy to Base Sepolia testnet (from root)
-pnpm -F circuit forge:deploy:baseSepolia
-
-# Deploy to Base mainnet (from root)
-pnpm -F circuit forge:deploy:base
+# Deploy to Monad Testnet (from root)
+pnpm -F circuit forge:deploy:monadTestnet
 ```
 
 > **Note:** The example ships with pre-compiled artifacts deployed by Lemma.

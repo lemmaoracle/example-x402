@@ -1,6 +1,6 @@
 # example-x402
 
-**Content is free. Trust costs $0.001.** — [Lemma](https://lemmaoracle.com) × [x402](https://x402.org) on Base Sepolia.
+**Content is free. Trust costs $0.001.** — [Lemma](https://lemmaoracle.com) × [x402](https://x402.org) on Monad Testnet.
 
 An AI agent fetches a blog article for free, discovers that a Lemma attestation
 is available, then pays $0.001 USDC to verify its provenance — author, publication
@@ -28,7 +28,7 @@ Blog ──[200 OK]──▶ Agent
 - [Node.js](https://nodejs.org/) 20+
 - [pnpm](https://pnpm.io/) 9+
 - [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/) (installed as a project dependency)
-- Base Sepolia wallet with test USDC ([faucet](https://docs.base.org/tools/testnet-faucet/))
+- Monad Testnet wallet with test USDC ([faucet](https://faucet.circle.com)) and MON for gas
 - Cloudflare account (free tier works)
 
 ## Quick Start
@@ -411,7 +411,7 @@ packages/
 scripts/
   generate-snippet.ts           Generate X-Lemma-Attestation header + <link> tag
   register-lemma-artifacts.mjs  Upload WASM/zkey to IPFS + register schema & circuit
-  check-balance.ts              Check agent wallet USDC balance on Base Sepolia
+  check-balance.ts              Check agent wallet USDC balance on Monad Testnet
   generate-bbs-keypair.ts       Generate BBS+ key pair for selective disclosure
   register-with-full-content.ts Register articles with full content support
   ai-redirect.js                JavaScript for AI redirection (demo helper)
@@ -449,5 +449,12 @@ pnpm register
 
 ## Network
 
-Base Sepolia testnet (chainId `84532`) — Base's public testnet, EVM-compatible, ideal for micropayment demos.
-RPC: `https://sepolia.base.org`
+Monad Testnet (chainId `10143`) — Monad's public testnet, EVM-compatible, ideal for micropayment demos.
+RPC: `https://testnet-rpc.monad.xyz`
+Explorer: `https://testnet.monadexplorer.com`
+Facilitator: `https://x402-facilitator.molandak.org`
+USDC: `0x534b2f3A21130d7a60830c2Df862319e593943A3`
+
+To get testnet tokens:
+- **USDC**: [Circle Faucet](https://faucet.circle.com) — select Monad Testnet
+- **MON** (gas): Use the Monad faucet

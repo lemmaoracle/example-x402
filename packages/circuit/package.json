@@ -11,8 +11,7 @@
     "forge:deploy": "forge script scripts/Deploy.s.sol --broadcast",
     "forge:deploy:sepolia": "forge script scripts/Deploy.s.sol --rpc-url sepolia --broadcast --verify",
     "forge:deploy:mainnet": "forge script scripts/Deploy.s.sol --rpc-url mainnet --broadcast --verify",
-    "forge:deploy:baseSepolia": "forge script scripts/Deploy.s.sol --rpc-url base_sepolia --broadcast --verify",
-    "forge:deploy:base": "forge script scripts/Deploy.s.sol --rpc-url base --broadcast --verify",
+    "forge:deploy:monadTestnet": "forge script scripts/Deploy.s.sol --rpc-url monad_testnet --broadcast --verify",
     "forge:node": "anvil"
   },
   "devDependencies": {
