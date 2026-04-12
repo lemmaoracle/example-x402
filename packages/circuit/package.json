@@ -8,15 +8,18 @@
     "forge:build": "forge build",
     "forge:test": "forge test -vvv",
     "forge:clean": "forge clean",
-    "forge:deploy": "forge script scripts/Deploy.s.sol --broadcast",
-    "forge:deploy:sepolia": "forge script scripts/Deploy.s.sol --rpc-url sepolia --broadcast --verify",
-    "forge:deploy:mainnet": "forge script scripts/Deploy.s.sol --rpc-url mainnet --broadcast --verify",
-    "forge:deploy:monadTestnet": "forge script scripts/Deploy.s.sol --rpc-url monad_testnet --broadcast --verify",
-    "forge:node": "anvil"
+    "forge:deploy": "dotenv -e ../../.env -- forge script scripts/Deploy.s.sol --broadcast",
+    "forge:deploy:sepolia": "dotenv -e ../../.env -- forge script scripts/Deploy.s.sol --rpc-url sepolia --broadcast --verify",
+    "forge:deploy:mainnet": "dotenv -e ../../.env -- forge script scripts/Deploy.s.sol --rpc-url mainnet --broadcast --verify",
+    "forge:deploy:monadTestnet": "dotenv -e ../../.env -- forge script scripts/Deploy.s.sol --rpc-url monad_testnet --broadcast --verify",
+    "forge:node": "anvil",
+    "install": "forge install foundry-rs/forge-std"
   },
   "devDependencies": {
     "circom2": "^0.2.22",
     "circomlib": "^2.0.5",
+    "dotenv": "^16.4.7",
+    "dotenv-cli": "^11.0.0",
     "snarkjs": "^0.7.5"
   }
 }

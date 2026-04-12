@@ -8,6 +8,9 @@
     "agent:disclosure": "pnpm --filter @example-x402/agent start -- --with-disclosure",
     "check-balance": "tsx scripts/check-balance.ts",
     "register": "node scripts/register-lemma-artifacts.mjs",
+    "register:schema": "tsx scripts/register-schema.ts",
+    "register:circuit": "tsx scripts/register-circuit.ts",
+    "register:all": "pnpm register:schema && pnpm register:circuit",
     "generate-keypair": "tsx scripts/generate-bbs-keypair.ts",
     "generate-snippet": "tsx scripts/generate-snippet.ts"
   },
@@ -18,6 +21,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
+    "dotenv": "^16.4.7",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   }
