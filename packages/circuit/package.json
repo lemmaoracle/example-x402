@@ -12,8 +12,7 @@
     "forge:deploy:sepolia": "dotenv -e ../../.env -- forge script scripts/Deploy.s.sol --rpc-url sepolia --broadcast --verify",
     "forge:deploy:mainnet": "dotenv -e ../../.env -- forge script scripts/Deploy.s.sol --rpc-url mainnet --broadcast --verify",
     "forge:deploy:monadTestnet": "dotenv -e ../../.env -- forge script scripts/Deploy.s.sol --rpc-url monad_testnet --broadcast --verify",
-    "forge:node": "anvil",
-    "install": "forge install foundry-rs/forge-std"
+    "forge:node": "anvil"
   },
   "devDependencies": {
     "circom2": "^0.2.22",
