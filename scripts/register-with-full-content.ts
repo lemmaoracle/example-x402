@@ -62,7 +62,7 @@ async function registerArticleWithFullContent(article: {
   const signed = await disclose.sign(client, {
     messages,
     secretKey: Buffer.from(secretKey, 'hex'),
-    header: new TextEncoder().encode("blog-article-v2"),
+    header: new TextEncoder().encode("blog-article-v1"),
     issuerId: article.author,
   });
   
@@ -73,7 +73,7 @@ async function registerArticleWithFullContent(article: {
     messages: signed.messages,
     publicKey: signed.publicKey,
     indexes: freeIndexes,
-    header: new TextEncoder().encode("blog-article-v2"),
+    header: new TextEncoder().encode("blog-article-v1"),
   });
   
   // Paid tier: reveal body and full content
@@ -83,7 +83,7 @@ async function registerArticleWithFullContent(article: {
     messages: signed.messages,
     publicKey: signed.publicKey,
     indexes: [...freeIndexes, ...paidIndexes], // All attributes
-    header: new TextEncoder().encode("blog-article-v2"),
+    header: new TextEncoder().encode("blog-article-v1"),
   });
   
 const docHash = `0x${normalized.integrity as string}`;
@@ -111,7 +111,7 @@ const docHash = `0x${normalized.integrity as string}`;
   // Submit proof with selective disclosure for free tier
   await proofs.submit(client, {
     docHash,
-    circuitId: "blog-article-v2",
+    circuitId: "blog-article-v1",
     proof: "", // Placeholder for production
     inputs: [
       normalized.author as string,
@@ -122,14 +122,38 @@ const docHash = `0x${normalized.integrity as string}`;
     ],
     disclosure: disclose.toSelectiveDisclosure(freeDisclosure, {
       publicKey: signed.publicKey,
-      header: new TextEncoder().encode("blog-article-v2"),
+      header: new TextEncoder().encode("blog-article-v1"),
       count: messages.length,
+    }),
+  });
+
+  // Submit proof with selective disclosure for paid tier
+  // condition: x402-payment-v1 requires on-chain payment proof to disclose
+  await proofs.submit(client, {
+    docHash,
+    circuitId: "blog-article-v1",
+    proof: "", // Placeholder for production
+    inputs: [
+      normalized.author as string,
+      normalized.body as string,
+      normalized.integrity as string,
+      String(normalized.words),
+      normalized.lang as string,
+      normalized.title as string,
+      String(normalized.published),
+      normalized.fullContent as string,
+    ],
+    disclosure: disclose.toSelectiveDisclosure(paidDisclosure, {
+      publicKey: signed.publicKey,
+      header: new TextEncoder().encode("blog-article-v1"),
+      count: messages.length,
+      condition: { circuitId: "x402-payment-v1" },
     }),
   });
   
   console.log(`✅ Article registered with docHash: ${docHash}`);
   console.log(`Free tier: title, author, date`);
-  console.log(`Paid tier: + body (${article.body.length} chars) and full content (${article.fullContent.length} chars)`);
+  console.log(`Paid tier: + body (${article.body.length} chars) and full content (${article.fullContent.length} chars) — requires x402 payment proof`);
   
   return {
     docHash,
