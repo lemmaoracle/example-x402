@@ -1,48 +1,95 @@
-# Lemma × x402: AI reads the web. AI pays for truth.
+# Lemma × x402: World's First Agent Payment with ZK Proof
 
-**Content is free. Trust costs $0.001.** — [Lemma](https://lemmaoracle.com) × [x402](https://x402.org) on Monad Testnet.
+**The missing layer between AI agents and money: cryptographic proof of _who paid_, _why_, and _whether the result is real_.**
 
-An AI agent fetches content from the web for free. When it discovers a Lemma
-attestation is available, it autonomously pays $0.001 USDC to verify provenance —
-author, publication date, content integrity — all backed by ZK proofs.
+[Lemma](https://lemmaoracle.com) × [x402](https://x402.org) on Monad Testnet.
 
-> **This demo uses a blog article as the entry-point example.**
-> The real story is bigger: as AI agents autonomously browse, procure, and act on
-> web data, they need a way to *pay for verified truth* — not just raw content.
-> Lemma + x402 is the infrastructure layer that makes that possible for any
-> verifiable data: research reports, credentials, IoT sensor readings,
-> financial attestations, on-chain events, and beyond.
+---
+
+## The Problem: Agents Can Pay — But Can't Prove Anything
+
+AI agents can already browse the web, call APIs, and make payments. That
+part is solved. What isn't solved:
+
+- **Who is this agent?** — No verifiable identity. Any process can claim to
+  act on behalf of anyone.
+- **Was the payment legitimate?** — The agent paid, but was it authorized?
+  Was the amount correct? Can a third party verify this without trusting
+  the agent's self-report?
+- **Is the data it received real?** — The agent got a response, but content
+  can be forged, tampered with, or hallucinated. There is no cryptographic
+  link between payment and truth.
+
+Today's agent payments are _blind transfers_. Money moves, but nothing is
+proven. In a world where
+[half the web may soon be agents](https://jibot.md/emissions/2026-04-04-trust-when-half-the-web-is-agents.md),
+this is the bottleneck — not the payment itself, but the **trust vacuum**
+around it.
+
+## What This Demo Proves
+
+This is not a content paywall. It is a reference implementation of
+**ZK-verified agent transactions** — the first system where every payment
+carries cryptographic proof of identity, authorization, and data integrity.
 
 ```
-Any content source ──[200 OK]──▶ AI Agent
-        │                              │
-        │  X-Lemma-Attestation header  "I have the data.
-        │  <link rel="lemma-attestation">  But can I trust it?"
-        │                              │
-        │                              ▼
-        │                       [$0.001 USDC]
-        │                              │
-        │                              ▼
-        └──────────── Worker (/verify) ──▶ Verified Attributes + ZK proof
-                      "Yes — author, date, integrity all check out."
+Agent ──[fetches data freely]──▶ Content Source
+  │                                     │
+  │  "I have the data, but can I        │ X-Lemma-Attestation header
+  │   trust it? And can anyone          │ signals: verification available
+  │   trust that I verified it?"        │
+  │                                     │
+  ▼                                     │
+  [$0.001 USDC via x402]               │
+  │                                     │
+  ▼                                     │
+  Lemma Worker ◀────────────────────────┘
+  │
+  ├─ ZK proof: payment occurred on-chain (x402-payment-v1 circuit)
+  ├─ ZK proof: data attributes are authentic (blog-article-v1 circuit)
+  ├─ BBS+ selective disclosure: reveal only what's needed
+  └─ Agent ID: issuer/subject DIDs link agent to human principal
+      │
+      ▼
+  Verified Result
+  "Author, date, integrity — all proven. Payment settled. Agent identified."
 ```
 
-### Why this matters for AI agents
+### Three Firsts in One Transaction
 
-When an AI agent acts autonomously — browsing the web, placing orders,
-making decisions based on external data — it cannot inherently trust what it
-reads. Today, agents either trust everything (risky) or verify nothing (useless).
+| Layer | What's proven | How |
+|-------|--------------|-----|
+| **Agent Identity** | The agent is authorized by a specific human principal | Issuer/subject DID pair + BBS+ signature chain |
+| **Payment Verification** | Payment actually occurred on-chain for the stated amount | `x402-payment-v1` ZK circuit — Poseidon commitment over tx data |
+| **Data Authenticity** | The received data hasn't been tampered with | `blog-article-v1` ZK circuit + SHA-256 integrity binding |
 
-Lemma × x402 introduces a third path: **pay a micropayment, get a ZK-verified
-attestation**. No API keys. No sign-up. No billing form. Just HTTP.
+A blog article is the entry-point example. The architecture generalizes to
+any verifiable data: credentials, sensor readings, financial attestations,
+research outputs, on-chain events.
 
-This works because:
-- **x402** turns any HTTP endpoint into a pay-per-use resource, with no
-  pre-registration required from either party
-- **Lemma** issues ZK proofs that attest to data attributes without revealing
-  the underlying content
-- Together, an agent can selectively verify what matters — and pay only for
-  the trust it needs
+---
+
+## Why This Matters: Trust as Infrastructure
+
+Joi Ito's [ito.md](https://ito.md) registry proposes a web of trust for agents — humans
+vouch for their agents, and trust flows through social graphs. The
+`trust_code` is machine-readable; the `personal_connection` is
+human-readable. This makes trust _legible_, but not _verifiable_.
+
+Lemma closes that gap. With BBS+ selective disclosure:
+
+- `trust_code` can be selectively disclosed — proven to a verifier without
+  revealing the full credential
+- `personal_connection` stays private — available only for human audit when
+  a trust decision needs review
+- **Agent ID becomes cryptographically bound** to a human principal, not
+  just socially asserted
+
+The combination is: social trust graph (ito.md) + cryptographic proof
+(Lemma) + native payment (x402) = **agents that can pay, prove, and be
+accountable**.
+
+---
 
 ## Deployed Schemas & Circuits
 
@@ -59,7 +106,8 @@ No local artifacts needed. These are already deployed on the network:
 
 ### Step 1: Register Content
 
-Register a blog article with a conditional disclosure (requires payment to access full content):
+Register a blog article with conditional disclosure (requires payment to
+access full content):
 
 ```bash
 pnpm register:content
@@ -99,9 +147,9 @@ Response:
 }
 ```
 
-#### 3b. Paid access → 200 OK with disclosed content
+#### 3b. Paid access → 200 OK with verified provenance
 
-Generate a x402 payment (see [x402 docs](https://docs.x402.org/)), then:
+Generate an x402 payment (see [x402 docs](https://docs.x402.org/)), then:
 
 ```bash
 curl -s -H "PAYMENT-SIGNATURE: <base64-encoded-payment-payload>" \
@@ -124,7 +172,50 @@ Response:
 }
 ```
 
-The `PAYMENT-RESPONSE` header contains the settlement proof for client-side verification.
+The `PAYMENT-RESPONSE` header contains the settlement proof for
+client-side verification.
+
+---
+
+## How It Works
+
+### Agent Experience (4 phases)
+
+| Phase | Action | What's Proven |
+|-------|--------|---------------|
+| 1 | Agent fetches content normally | Data acquired (free, unverified) |
+| 2 | Agent discovers `X-Lemma-Attestation` header | Attestation available |
+| 3 | Agent pays $0.001 via x402 → receives verified attributes | Payment on-chain + data authenticity (ZK) |
+| 4 | Agent compares content hash with `integrity` attribute | End-to-end integrity confirmed |
+
+### x402 Protocol Flow (inside the worker)
+
+```
+Client Request
+  │
+  ├─ No PAYMENT-SIGNATURE header?
+  │   └─ 402 Payment Required (with Lemma attestation metadata)
+  │
+  ├─ PAYMENT-SIGNATURE present
+  │   ├─ 1. Facilitator /verify  — pre-check (signature, amount, balance)
+  │   ├─ 2. Facilitator /settle  — broadcast tx, wait for confirmation
+  │   ├─ 3. Lemma API /verified-attributes/query
+  │   │     └─ Settlement proof used as disclosure credential
+  │   └─ 4. Return 200 + PAYMENT-RESPONSE header
+  │
+  └─ Invalid payment?
+      └─ 402 with reason
+```
+
+### Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|\
+| `/verify/:hash` | GET | Provenance verification (main) — verified attributes + proof status |
+| `/query` | POST | Full query with BBS+ selective disclosure (advanced) |
+| `/` | GET | Health check |
+
+---
 
 ## Prerequisites
 
@@ -179,74 +270,12 @@ pnpm agent:disclosure
 
 ---
 
-## How It Works
-
-### Agent Experience (4 phases)
-
-| Phase | Action | Result |
-|-------|--------|--------|
-| 1 | Agent fetches content normally | Data acquired (free) |
-| 2 | Agent displays content | Marked as **unverified** |
-| 3 | Agent discovers `X-Lemma-Attestation` header → pays $0.001 | Verified Attributes received |
-| 4 | Agent compares content hash with `integrity` attribute | Content marked as **verified** |
-
-### Endpoints
-
-| Endpoint | Method | Purpose |
-|----------|--------|---------|\
-| `/verify/:hash` | GET | Provenance verification (main) — returns verified attributes + proof status |
-| `/query` | POST | Full query with BBS+ selective disclosure (advanced) |
-| `/` | GET | Health check |
-
-### 402 Response (before payment)
-
-When an agent hits `GET /verify/:hash` without payment, the worker returns
-`402 Payment Required` with attestation metadata:
-
-```json
-{
-  "lemmaAttestation": {
-    "schema": "blog-article",
-    "verifiable": ["author", "published", "integrity", "words", "lang"]
-  }
-}
-```
-
-### Verified Response (after payment)
-
-```json
-{
-  "results": [{
-    "docHash": "0x...",
-    "schema": "blog-article",
-    "attributes": {
-      "author": "did:example:alice",
-      "published": 1775001600,
-      "words": 1500,
-      "lang": "en",
-      "integrity": "ab12..."
-    },
-    "proof": {
-      "status": "verified",
-      "circuitId": "blog-article-v1"
-    }
-  }]
-}
-```
-
-The agent compares its locally computed SHA-256 of the blog content against
-the `integrity` attribute. If they match, the content is authentic.
-
----
-
 ## Discovery: Integrate with Your Content Source
 
-Lemma uses a pull-based discovery model. Your content source signals that attestation
-is available; compatible agents pick it up automatically.
+Lemma uses a pull-based discovery model. Your content source signals that
+attestation is available; compatible agents pick it up automatically.
 
 ### A: HTTP Response Header (recommended)
-
-Add these headers in your server, CDN, or middleware:
 
 ```
 X-Lemma-Attestation: https://your-worker.workers.dev/verify/0xabc123
@@ -256,7 +285,6 @@ X-Lemma-Schema: blog-article-v1
 Cloudflare Worker example:
 
 ```ts
-// In your content source's Worker or middleware
 export default {
   async fetch(request, env) {
     const response = await env.CONTENT.fetch(request);
@@ -273,8 +301,6 @@ export default {
 
 ### B: HTML `<link>` meta tag
 
-Add one line to your page template's `<head>`:
-
 ```html
 <link
   rel="lemma-attestation"
@@ -283,12 +309,7 @@ Add one line to your page template's `<head>`:
 />
 ```
 
-Like `agent-permissions.json`, this is a lightweight declaration — only
-compatible agents react to it; everything else ignores it.
-
 ### Snippet Generator
-
-Use the provided script to generate both snippets for an article:
 
 ```bash
 pnpm generate-snippet -- --docHash 0xabc123... --worker-url https://your-worker.workers.dev
@@ -297,9 +318,6 @@ pnpm generate-snippet -- --docHash 0xabc123... --worker-url https://your-worker.
 ---
 
 ## Registering Articles with Lemma
-
-This section covers the registration pipeline — how your blog articles
-get attested by Lemma so the `/verify` endpoint can serve them.
 
 ### Step 1: Generate a BBS+ key pair (one-time)
 
@@ -329,9 +347,6 @@ const prep = await prepare(client, {
     lang:        "en",
   },
 });
-
-// prep.normalized  → { author, published, integrity, words, lang }
-// prep.commitments → { root, leaves, randomness }
 ```
 
 ### Step 3: Sign and create selective disclosure
@@ -360,8 +375,6 @@ const signed = await disclose.sign(client, {
 });
 
 // Selective disclosure: reveal title + body
-// Sorted keys: author, body, integrity, lang, published, title, words
-//              0       1     2          3     4          5      6
 const TITLE_IDX = 5;
 const BODY_IDX  = 1;
 
@@ -419,7 +432,6 @@ await proofs.submit(client, {
 ### GitHub Action Example
 
 ```yaml
-# .github/workflows/register-articles.yml
 name: Register articles with Lemma
 on:
   push:
@@ -432,7 +444,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - run: pnpm install
-
       - name: Register new/changed articles
         env:
           LEMMA_BBS_SECRET_KEY: ${{ secrets.LEMMA_BBS_SECRET_KEY }}
@@ -445,19 +456,18 @@ jobs:
 ## Advanced: BBS+ Selective Disclosure
 
 The `POST /query` endpoint provides full BBS+ selective disclosure — the
-agent can receive disclosed title/body alongside verified attributes. This
-is Lemma's core technical differentiator and useful for agents that need
-the actual content, not just provenance.
+agent can receive disclosed fields alongside verified attributes.
+
+This is how Lemma enables the trust model described in
+[Joi Ito's agent trust framework](https://jibot.md/emissions/2026-04-04-trust-when-half-the-web-is-agents.md):
+`trust_code` is selectively disclosed and machine-verifiable, while
+`personal_connection` remains private for human review.
 
 ```bash
-# Run agent with disclosure
 pnpm agent:disclosure
 ```
 
-The agent script uses the `--with-disclosure` flag to additionally query
-the `/query` endpoint after the standard verification flow.
-
-### Query Response (after payment)
+### Query Response
 
 ```json
 {
@@ -485,21 +495,14 @@ the `/query` endpoint after the standard verification flow.
 
 ## Demo Helper: AI Redirection
 
-For quick 5-minute demos, the worker includes AI detection endpoints that
-redirect AI agents from a blog to the payment gateway. This is a convenience
-for demonstrations — **for production, use the header/meta tag discovery
-approach described above.**
+For quick demos, the worker includes AI detection endpoints that redirect
+AI agents from a blog to the payment gateway. This is a demo convenience —
+**for production, use the header/meta tag discovery approach above.**
 
 ```bash
-# Test AI detection (no worker needed)
 node scripts/test-ai-detection.js
-
-# Test worker endpoints (requires running worker)
 WORKER_URL=http://localhost:8787 node scripts/test-worker-endpoints.js
 ```
-
-See `scripts/ai-redirect.js` (static blogs) and `scripts/wordpress-ai-redirect.php`
-(WordPress) for integration examples.
 
 ---
 
@@ -526,16 +529,11 @@ scripts/
 ## Register Custom Artifacts
 
 If you modify `packages/normalize` or `packages/circuit`, rebuild and
-re-register the artifacts with Lemma:
+re-register:
 
 ```bash
-# 1. Build normalize WASM
 cd packages/normalize && wasm-pack build --target web && cd ../..
-
-# 2. Build circuit (circom + snarkjs)
 cd packages/circuit && ./scripts/build.sh && cd ../..
-
-# 3. Upload to IPFS + register schema & circuit in one step
 cp .env.example .env   # fill in PINATA_API_KEY, PINATA_SECRET_API_KEY, LEMMA_API_KEY
 pnpm register
 ```
@@ -552,12 +550,24 @@ pnpm register
 
 ## Network
 
-Monad Testnet (chainId `10143`) — Monad's public testnet, EVM-compatible, ideal for micropayment demos.
-RPC: `https://testnet-rpc.monad.xyz`
-Explorer: `https://testnet.monadexplorer.com`
-Facilitator: `https://x402-facilitator.lemma.workers.dev`
-USDC: `0x534b2f3A21130d7a60830c2Df862319e593943A3`
+Monad Testnet (chainId `10143`) — EVM-compatible, ideal for micropayment
+demos.
 
-To get testnet tokens:
+| Resource | URL |
+|----------|-----|
+| RPC | `https://testnet-rpc.monad.xyz` |
+| Explorer | `https://testnet.monadexplorer.com` |
+| Facilitator | `https://x402-facilitator.lemma.workers.dev` |
+| USDC | `0x534b2f3A21130d7a60830c2Df862319e593943A3` |
+
+Testnet tokens:
 - **USDC**: [Circle Faucet](https://faucet.circle.com) — select Monad Testnet
 - **MON** (gas): Use the Monad faucet
+
+---
+
+## Further Reading
+
+- [Who Do You Trust When Half the Web Is Agents?](https://jibot.md/emissions/2026-04-04-trust-when-half-the-web-is-agents.md) — Joi Ito on agent identity and social trust graphs
+- [x402 Protocol Specification](https://x402.org) — HTTP-native payments
+- [Lemma Oracle](https://lemmaoracle.com) — ZK-verified data attestations
