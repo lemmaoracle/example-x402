@@ -12,6 +12,7 @@
     "forge:deploy:sepolia": "dotenv -e ../../.env -- forge script scripts/Deploy.s.sol --rpc-url sepolia --broadcast --verify",
     "forge:deploy:mainnet": "dotenv -e ../../.env -- forge script scripts/Deploy.s.sol --rpc-url mainnet --broadcast --verify",
     "forge:deploy:monadTestnet": "dotenv -e ../../.env -- forge script scripts/Deploy.s.sol --rpc-url monad_testnet --broadcast --verify",
+    "forge:deploy:baseSepolia": "dotenv -e ../../.env -- forge script scripts/Deploy.s.sol --rpc-url base_sepolia --broadcast --verify",
     "forge:node": "anvil"
   },
   "devDependencies": {

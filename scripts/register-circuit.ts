@@ -24,10 +24,12 @@ const LEMMA_API_KEY = process.env.LEMMA_API_KEY;
 const PINATA_API_KEY = process.env.PINATA_API_KEY;
 const PINATA_SECRET_API_KEY = process.env.PINATA_SECRET_API_KEY;
 
+// Verifier contract address from deployment (Base Sepolia)
+const VERIFIER_ADDRESS_BASE_SEPOLIA = "0x6D5e1Cac9B9FF7b76A25b8f4952EFbD0604b0364";
+const CHAIN_ID_BASE_SEPOLIA = 84532; // Base Sepolia
 // Verifier contract address from deployment (Monad Testnet)
-// Update this after deploying the verifier contract
-const VERIFIER_ADDRESS = "0xa2c825aa3a814c5ad399b9722af12e0c162403ca";
-const CHAIN_ID = 10143; // Monad Testnet
+const VERIFIER_ADDRESS_MONAD_TESTNET = "0x389f2454cac47622EDCafc684EE51d3B8f61d397";
+const CHAIN_ID_MONAD_TESTNET = 10143; // Monad Testnet
 
 /* ------------------------------------------------------------------ */
 /*  Pinata Upload Functions                                           */
@@ -127,8 +129,14 @@ const buildCircuitMeta = (wasmIpfsUrl: string, zkeyIpfsUrl: string): CircuitMeta
   verifiers: [
     {
       type: "onchain",
-      address: VERIFIER_ADDRESS,
-      chainId: CHAIN_ID,
+      address: VERIFIER_ADDRESS_BASE_SEPOLIA,
+      chainId: CHAIN_ID_BASE_SEPOLIA,
+      alg: "groth16-bn254-snarkjs",
+    },
+    {
+      type: "onchain",
+      address: VERIFIER_ADDRESS_MONAD_TESTNET,
+      chainId: CHAIN_ID_MONAD_TESTNET,
       alg: "groth16-bn254-snarkjs",
     },
   ],
@@ -138,13 +146,6 @@ const buildCircuitMeta = (wasmIpfsUrl: string, zkeyIpfsUrl: string): CircuitMeta
       wasm: wasmIpfsUrl,
       zkey: zkeyIpfsUrl,
     },
-  },
-  metadata: {
-    network: "monad-testnet",
-    chainId: CHAIN_ID,
-    version: "1.0",
-    circuitType: "commitment-opening",
-    description: "Proves knowledge of article attributes that hash to a public commitment",
   },
 });
 
@@ -177,7 +178,8 @@ const main = async (): Promise<void> => {
     console.log("\n✅ Circuit registered successfully!");
     console.log(`📝 Circuit ID: ${registeredCircuit.circuitId}`);
     console.log(`🔗 Schema: ${registeredCircuit.schema}`);
-    console.log(`🏢 Verifier: ${VERIFIER_ADDRESS} (Chain: ${CHAIN_ID})`);
+    console.log(`🏢 Verifier: ${VERIFIER_ADDRESS_BASE_SEPOLIA} (Chain: ${CHAIN_ID_BASE_SEPOLIA})`);
+    console.log(`🏢 Verifier: ${VERIFIER_ADDRESS_MONAD_TESTNET} (Chain: ${CHAIN_ID_MONAD_TESTNET})`);
     console.log(`📦 WASM IPFS: ${wasmIpfsUrl}`);
     console.log(`📦 zKey IPFS: ${zkeyIpfsUrl}`);
     console.log("\n🎉 Blog-article-v1 circuit is now ready for use!");
