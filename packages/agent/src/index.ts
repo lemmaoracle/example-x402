@@ -25,7 +25,7 @@ import { privateKeyToAccount } from "viem/accounts";
 // Configuration
 // ---------------------------------------------------------------------------
 const WORKER_URL = process.env.WORKER_URL;
-const AGENT_PRIVATE_KEY = process.env.AGENT_PRIVATE_KEY as
+let AGENT_PRIVATE_KEY = process.env.AGENT_PRIVATE_KEY as
   | `0x${string}`
   | undefined;
 const BLOG_URL =
@@ -41,10 +41,17 @@ if (!WORKER_URL) {
   process.exit(1);
 }
 
+// Generate a random key if not provided (demo mode)
+// In demo mode, the worker skips blockchain verification
 if (!AGENT_PRIVATE_KEY) {
-  console.error("Error: AGENT_PRIVATE_KEY environment variable is required.");
-  console.error("Set it to a 0x-prefixed private key with Monad testnet USDC.");
-  process.exit(1);
+  console.warn("Warning: AGENT_PRIVATE_KEY not set. Using demo mode with random key.");
+  console.warn("For real transactions, set AGENT_PRIVATE_KEY to a wallet with Monad testnet USDC.\n");
+  // Generate 32 random bytes as hex
+  const randomBytes = new Uint8Array(32);
+  crypto.getRandomValues(randomBytes);
+  AGENT_PRIVATE_KEY = `0x${Array.from(randomBytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")}` as `0x${string}`;
 }
 
 // ---------------------------------------------------------------------------

@@ -32,6 +32,8 @@ type Env = {
   readonly FACILITATOR_URL: string;
   readonly LEMMA_API_BASE: string;
   readonly LEMMA_API_KEY?: string;
+  /** Demo mode: skip real blockchain verification (for quick demos without wallet setup). */
+  readonly DEMO_MODE?: string;
 };
 
 /** Payment requirements for x402 v2 (inside accepts array). */
@@ -299,6 +301,7 @@ async function facilitatorVerify(
   facilitatorUrl: string,
   paymentPayloadStr: string,
   serverRequirements: PaymentRequiredV2,
+  demoMode: boolean = false,
 ): Promise<VerifyResponse> {
   // Parse the payment payload to extract x402Version and accepted requirements
   let paymentPayload: PaymentPayloadV2;
@@ -306,6 +309,14 @@ async function facilitatorVerify(
     paymentPayload = JSON.parse(paymentPayloadStr) as PaymentPayloadV2;
   } catch {
     throw new Error("Invalid payment payload: not valid JSON");
+  }
+
+  // Demo mode: skip blockchain verification, always return valid
+  if (demoMode) {
+    return {
+      isValid: true,
+      invalidReason: null,
+    };
   }
 
   // Use the client's accepted requirements for verification
@@ -342,6 +353,7 @@ async function facilitatorSettle(
   facilitatorUrl: string,
   paymentPayloadStr: string,
   serverRequirements: PaymentRequiredV2,
+  demoMode: boolean = false,
 ): Promise<SettleResponse> {
   // Parse the payment payload to extract x402Version and accepted requirements
   let paymentPayload: PaymentPayloadV2;
@@ -349,6 +361,15 @@ async function facilitatorSettle(
     paymentPayload = JSON.parse(paymentPayloadStr) as PaymentPayloadV2;
   } catch {
     throw new Error("Invalid payment payload: not valid JSON");
+  }
+
+  // Demo mode: return mock settlement with fake txHash and proof
+  if (demoMode) {
+    return {
+      success: true,
+      txHash: "0x" + "d".repeat(64), // Mock tx hash
+      proof: "demo-proof-base64",
+    };
   }
 
   // Use the client's accepted requirements for settlement
@@ -420,12 +441,14 @@ app.get("/verify/:hash", async (c) => {
   }
 
   // Step 2: Verify payment with facilitator (lightweight pre-check)
+  const demoMode = c.env.DEMO_MODE === "true";
   let verification: VerifyResponse;
   try {
     verification = await facilitatorVerify(
       facilitatorUrl,
       paymentPayload,
       requirements,
+      demoMode,
     );
   } catch (err) {
     return c.json(
@@ -456,6 +479,7 @@ app.get("/verify/:hash", async (c) => {
       facilitatorUrl,
       paymentPayload,
       requirements,
+      demoMode,
     );
   } catch (err) {
     return c.json(
@@ -471,24 +495,50 @@ app.get("/verify/:hash", async (c) => {
   const apiBase = c.env.LEMMA_API_BASE.replace(/\/$/, "");
   const apiKey = c.env.LEMMA_API_KEY;
 
-  const response = await fetch(`${apiBase}/verified-attributes/query`, {
-    method: "POST",
-    headers: lemmaHeaders(apiKey),
-    body: JSON.stringify({
-      docHash: hash,
-      disclosure: {
-        proof: settlement.proof,
-        inputs: settlement.inputs ?? [],
-      },
-    }),
-  });
+  let data: LemmaQueryResponse;
 
-  if (!response.ok) {
-    const error = await response.text();
-    return c.json({ error }, response.status as 500);
+  if (demoMode) {
+    // Demo mode: return mock provenance data
+    data = {
+      results: [
+        {
+          docHash: hash,
+          schema: "blog-article",
+          issuerId: "did:example:lemma",
+          subjectId: "did:example:blog-author",
+          attributes: {
+            title: "Zero-Knowledge Proofs: A Gentle Introduction",
+            author: "Alice",
+            published: "2024-03-15",
+            integrity: "sha256-abc123",
+            words: 1200,
+            lang: "en",
+          },
+          proof: { circuitId: "blog-article-v1" },
+        },
+      ],
+      hasMore: false,
+    };
+  } else {
+    const response = await fetch(`${apiBase}/verified-attributes/query`, {
+      method: "POST",
+      headers: lemmaHeaders(apiKey),
+      body: JSON.stringify({
+        docHash: hash,
+        disclosure: {
+          proof: settlement.proof,
+          inputs: settlement.inputs ?? [],
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      return c.json({ error }, response.status as 500);
+    }
+
+    data = (await response.json()) as LemmaQueryResponse;
   }
-
-  const data = (await response.json()) as LemmaQueryResponse;
 
   if (data.results.length === 0) {
     return c.json({ error: "document_not_found", docHash: hash }, 404);
@@ -533,12 +583,14 @@ app.post("/query", async (c) => {
   }
 
   // Step 2: Verify payment with facilitator
+  const demoMode = c.env.DEMO_MODE === "true";
   let verification: VerifyResponse;
   try {
     verification = await facilitatorVerify(
       facilitatorUrl,
       paymentPayload,
       requirements,
+      demoMode,
     );
   } catch (err) {
     return c.json(
@@ -568,6 +620,7 @@ app.post("/query", async (c) => {
       facilitatorUrl,
       paymentPayload,
       requirements,
+      demoMode,
     );
   } catch (err) {
     return c.json(
@@ -584,28 +637,62 @@ app.post("/query", async (c) => {
     .json<Record<string, unknown>>()
     .catch(() => ({}));
 
-  // Merge the caller's query params with the settlement proof disclosure.
-  // The proof from /settle replaces any client-provided disclosure.
-  const body = {
-    ...callerBody,
-    disclosure: {
-      proof: settlement.proof,
-      inputs: settlement.inputs ?? [],
-    },
-  };
+  let data: LemmaQueryResponse;
 
-  const response = await fetch(`${apiBase}/verified-attributes/query`, {
-    method: "POST",
-    headers: lemmaHeaders(apiKey),
-    body: JSON.stringify(body),
-  });
+  if (demoMode) {
+    // Demo mode: return mock query results with selective disclosure
+    data = {
+      results: [
+        {
+          docHash: "0xa1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4",
+          schema: "blog-article",
+          issuerId: "did:example:lemma",
+          subjectId: "did:example:blog-author",
+          attributes: {
+            title: "Zero-Knowledge Proofs: A Gentle Introduction",
+            author: "Alice",
+            published: "2024-03-15",
+            integrity: "sha256-abc123",
+            words: 1200,
+            lang: "en",
+          },
+          disclosure: {
+            format: "BBS+",
+            attributes: { author: "Alice", published: "2024-03-15" },
+            proof: "mock-bbs-proof",
+            publicKey: "mock-public-key",
+            indexes: [1, 2],
+            count: 6,
+            header: "mock-header",
+          },
+        },
+      ],
+      hasMore: false,
+    };
+  } else {
+    // Merge the caller's query params with the settlement proof disclosure.
+    // The proof from /settle replaces any client-provided disclosure.
+    const body = {
+      ...callerBody,
+      disclosure: {
+        proof: settlement.proof,
+        inputs: settlement.inputs ?? [],
+      },
+    };
 
-  if (!response.ok) {
-    const error = await response.text();
-    return c.json({ error }, response.status as 500);
+    const response = await fetch(`${apiBase}/verified-attributes/query`, {
+      method: "POST",
+      headers: lemmaHeaders(apiKey),
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      return c.json({ error }, response.status as 500);
+    }
+
+    data = (await response.json()) as LemmaQueryResponse;
   }
-
-  const data = (await response.json()) as LemmaQueryResponse;
 
   // Step 5: Return query results with PAYMENT-RESPONSE header
   return c.json(
