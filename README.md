@@ -2,7 +2,7 @@
 
 **The missing layer between AI agents and money: cryptographic proof of _who paid_, _why_, and _whether the result is real_.**
 
-[Lemma](https://lemmaoracle.com) × [x402](https://x402.org) on Base Sepolia.
+[Lemma](https://lemma.frame00.com) × [x402](https://x402.org) on Base Sepolia.
 
 ---
 
@@ -564,6 +564,6 @@ Testnet tokens:
 
 ## Further Reading
 
-- [Agent Trust and Identity Challenges](https://lemmaoracle.com/blog/agent-trust) — Exploring verifiable trust for autonomous agents
+- [Cryptographic Trust Chains Between Agents](https://lemma.frame00.com/blog/agent-cryptographic-trust-chain-a2a-api-economy) — A2A collaboration in the API economy
 - [x402 Protocol Specification](https://x402.org) — HTTP-native payments
-- [Lemma Oracle](https://lemmaoracle.com) — ZK-verified data attestations
+- [Lemma Oracle](https://lemma.frame00.com) — ZK-verified data attestations
