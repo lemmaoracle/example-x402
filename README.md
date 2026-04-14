@@ -2,7 +2,7 @@
 
 **The missing layer between AI agents and money: cryptographic proof of _who paid_, _why_, and _whether the result is real_.**
 
-[Lemma](https://lemmaoracle.com) × [x402](https://x402.org) on Monad Testnet.
+[Lemma](https://lemmaoracle.com) × [x402](https://x402.org) on Base Sepolia.
 
 ---
 
@@ -22,7 +22,7 @@ part is solved. What isn't solved:
 
 Today's agent payments are _blind transfers_. Money moves, but nothing is
 proven. In a world where
-[half the web may soon be agents](https://jibot.md/emissions/2026-04-04-trust-when-half-the-web-is-agents.md),
+half the web may soon be agents,
 this is the bottleneck — not the payment itself, but the **trust vacuum**
 around it.
 
@@ -71,23 +71,20 @@ research outputs, on-chain events.
 
 ## Why This Matters: Trust as Infrastructure
 
-Joi Ito's [ito.md](https://ito.md) registry proposes a web of trust for agents — humans
-vouch for their agents, and trust flows through social graphs. The
-`trust_code` is machine-readable; the `personal_connection` is
-human-readable. This makes trust _legible_, but not _verifiable_.
+In a world of autonomous agents, trust must be both machine-verifiable and human-auditable. 
+Traditional approaches rely on social graphs where humans vouch for their agents, 
+but this makes trust _legible_ without being _verifiable_.
 
 Lemma closes that gap. With BBS+ selective disclosure:
 
-- `trust_code` can be selectively disclosed — proven to a verifier without
+- Machine-readable trust attributes can be selectively disclosed — proven to a verifier without
   revealing the full credential
-- `personal_connection` stays private — available only for human audit when
-  a trust decision needs review
+- Human-auditable context stays private — available only for review when
+  a trust decision needs deeper inspection
 - **Agent ID becomes cryptographically bound** to a human principal, not
   just socially asserted
 
-The combination is: social trust graph (ito.md) + cryptographic proof
-(Lemma) + native payment (x402) = **agents that can pay, prove, and be
-accountable**.
+The combination is: verifiable trust + cryptographic proof (Lemma) + native payment (x402) = **agents that can pay, prove, and be accountable**.
 
 ---
 
@@ -96,9 +93,9 @@ accountable**.
 No local artifacts needed. These are already deployed on the network:
 
 | Type | ID | Purpose |
-|------|-----|---------|\
+|------|-----|---------|
 | Schema | `passthrough-v1` | Simple passthrough for any payload |
-| Circuit | `x402-payment-v1` | Proves on-chain payment (Monad Testnet) |
+| Circuit | `x402-payment-v1` | Proves on-chain payment (Base Sepolia) |
 | Schema | `blog-article-v1` | Blog article normalization |
 | Circuit | `blog-article-v1` | Verifies blog article attributes |
 
@@ -222,7 +219,7 @@ Client Request
 - [Node.js](https://nodejs.org/) 20+
 - [pnpm](https://pnpm.io/) 9+
 - [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/) (installed as a project dependency)
-- Monad Testnet wallet with test USDC ([faucet](https://faucet.circle.com)) and MON for gas
+- Base Sepolia wallet with test USDC ([faucet](https://faucet.circle.com)) and ETH for gas
 - Cloudflare account (free tier works)
 
 ## Quick Start
@@ -458,10 +455,9 @@ jobs:
 The `POST /query` endpoint provides full BBS+ selective disclosure — the
 agent can receive disclosed fields alongside verified attributes.
 
-This is how Lemma enables the trust model described in
-[Joi Ito's agent trust framework](https://jibot.md/emissions/2026-04-04-trust-when-half-the-web-is-agents.md):
-`trust_code` is selectively disclosed and machine-verifiable, while
-`personal_connection` remains private for human review.
+This is how Lemma enables a verifiable trust model:
+machine-readable trust attributes are selectively disclosed and verifiable, 
+while human-auditable context remains private for review.
 
 ```bash
 pnpm agent:disclosure
@@ -550,24 +546,24 @@ pnpm register
 
 ## Network
 
-Monad Testnet (chainId `10143`) — EVM-compatible, ideal for micropayment
+Base Sepolia (chainId `84532`) — EVM-compatible, ideal for micropayment
 demos.
 
 | Resource | URL |
 |----------|-----|
-| RPC | `https://testnet-rpc.monad.xyz` |
-| Explorer | `https://testnet.monadexplorer.com` |
+| RPC | `https://sepolia.base.org` |
+| Explorer | `https://sepolia.basescan.org` |
 | Facilitator | `https://x402-facilitator.lemma.workers.dev` |
-| USDC | `0x534b2f3A21130d7a60830c2Df862319e593943A3` |
+| USDC | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
 
 Testnet tokens:
-- **USDC**: [Circle Faucet](https://faucet.circle.com) — select Monad Testnet
-- **MON** (gas): Use the Monad faucet
+- **USDC**: [Circle Faucet](https://faucet.circle.com) — select Base Sepolia
+- **ETH** (gas): Use a Base Sepolia faucet (e.g., [Base Faucet](https://www.alchemy.com/faucets/base-sepolia))
 
 ---
 
 ## Further Reading
 
-- [Who Do You Trust When Half the Web Is Agents?](https://jibot.md/emissions/2026-04-04-trust-when-half-the-web-is-agents.md) — Joi Ito on agent identity and social trust graphs
+- [Agent Trust and Identity Challenges](https://lemmaoracle.com/blog/agent-trust) — Exploring verifiable trust for autonomous agents
 - [x402 Protocol Specification](https://x402.org) — HTTP-native payments
 - [Lemma Oracle](https://lemmaoracle.com) — ZK-verified data attestations
