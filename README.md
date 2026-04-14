@@ -1,4 +1,4 @@
-# example-x402
+# Lemma x402 Demo
 
 **Content is free. Trust costs $0.001.** — [Lemma](https://lemmaoracle.com) × [x402](https://x402.org) on Monad Testnet.
 
@@ -22,6 +22,88 @@ Blog ──[200 OK]──▶ Agent
  └──────────── Worker (/verify) ──▶ Verified Attributes + proof
                "Yes — author, date, integrity all check out."
 ```
+
+## Deployed Schemas & Circuits
+
+No local artifacts needed. These are already deployed on the network:
+
+| Type | ID | Purpose |
+|------|-----|---------|
+| Schema | `passthrough-v1` | Simple passthrough for any payload |
+| Circuit | `x402-payment-v1` | Proves on-chain payment (Monad Testnet) |
+| Schema | `blog-article-v1` | Blog article normalization |
+| Circuit | `blog-article-v1` | Verifies blog article attributes |
+
+## Demo Steps (5 minutes)
+
+### Step 1: Register Content
+
+Register a blog article with a conditional disclosure (requires payment to access full content):
+
+```bash
+pnpm register:content
+```
+
+This creates:
+- A document with `blog-article-v1` schema
+- **Free tier proof**: verifiable without payment (title, author, date)
+- **Paid tier proof**: requires `x402-payment-v1` circuit proof (body, full content)
+
+The script outputs a `docHash` — you will use this in Step 3.
+
+> **Note**: Skip this step if you already have a registered docHash.
+
+### Step 2: Start the Resource Worker
+
+```bash
+pnpm dev:worker
+```
+
+The worker runs at `http://localhost:8787`.
+
+### Step 3: Test the x402 Flow
+
+#### 3a. Unauthenticated access → 402 Payment Required
+
+```bash
+curl -s http://localhost:8787/verify/<your-docHash> | jq
+```
+
+Response:
+```json
+{
+  "error": "payment_required",
+  "message": "Content is free. Trust costs $0.001.",
+  "paymentRequirements": { ... }
+}
+```
+
+#### 3b. Paid access → 200 OK with disclosed content
+
+Generate a x402 payment (see [x402 docs](https://docs.x402.org/)), then:
+
+```bash
+curl -s -H "PAYMENT-SIGNATURE: <base64-encoded-payment-payload>" \
+  http://localhost:8787/verify/<your-docHash> | jq
+```
+
+Response:
+```json
+{
+  "results": [
+    {
+      "docHash": "0x...",
+      "schema": "blog-article-v1",
+      "issuerId": "...",
+      "subjectId": "...",
+      "disclosed": { "body": "...", "fullContent": "..." },
+      "proof": { "status": "verified", "circuitId": "blog-article-v1" }
+    }
+  ]
+}
+```
+
+The `PAYMENT-RESPONSE` header contains the settlement proof for client-side verification.
 
 ## Prerequisites
 
@@ -452,7 +534,7 @@ pnpm register
 Monad Testnet (chainId `10143`) — Monad's public testnet, EVM-compatible, ideal for micropayment demos.
 RPC: `https://testnet-rpc.monad.xyz`
 Explorer: `https://testnet.monadexplorer.com`
-Facilitator: `https://x402-facilitator.molandak.org`
+Facilitator: `https://x402-facilitator.lemma.workers.dev`
 USDC: `0x534b2f3A21130d7a60830c2Df862319e593943A3`
 
 To get testnet tokens:

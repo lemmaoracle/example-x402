@@ -11,12 +11,13 @@
     "register:schema": "tsx scripts/register-schema.ts",
     "register:circuit": "tsx scripts/register-circuit.ts",
     "register:all": "pnpm register:schema && pnpm register:circuit",
+    "register:content": "tsx scripts/register-with-full-content.ts",
     "generate-keypair": "tsx scripts/generate-bbs-keypair.ts",
     "generate-snippet": "tsx scripts/generate-snippet.ts"
   },
   "dependencies": {
-    "@lemmaoracle/sdk": "0.0.16",
-    "@lemmaoracle/spec": "0.0.16",
+    "@lemmaoracle/sdk": "0.0.17",
+    "@lemmaoracle/spec": "0.0.17",
     "viem": "^2.21.54"
   },
   "devDependencies": {

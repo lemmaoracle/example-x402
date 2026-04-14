@@ -5,7 +5,7 @@ compatibility_flags = ["nodejs_compat"]
 
 [vars]
 LEMMA_API_BASE = "https://workers.lemma.workers.dev"
-FACILITATOR_URL = "https://x402-facilitator.molandak.org"
+FACILITATOR_URL = "https://x402-facilitator.lemma.workers.dev"
 PAY_TO_ADDRESS = "0x000000000000000000000000000000000000dEaD"  # Demo: burn address
 DEMO_MODE = "true"  # Skip blockchain verification for quick demos
 
