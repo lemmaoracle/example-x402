@@ -1,34 +1,55 @@
-# Lemma x402 Demo
+# Lemma × x402: AI reads the web. AI pays for truth.
 
 **Content is free. Trust costs $0.001.** — [Lemma](https://lemmaoracle.com) × [x402](https://x402.org) on Monad Testnet.
 
-An AI agent fetches a blog article for free, discovers that a Lemma attestation
-is available, then pays $0.001 USDC to verify its provenance — author, publication
-date, content integrity — all backed by ZK proofs.
+An AI agent fetches content from the web for free. When it discovers a Lemma
+attestation is available, it autonomously pays $0.001 USDC to verify provenance —
+author, publication date, content integrity — all backed by ZK proofs.
 
-> This demo uses blog articles, but Lemma works with any verifiable data:
-> research reports, credentials, IoT sensor readings, financial attestations, etc.
+> **This demo uses a blog article as the entry-point example.**
+> The real story is bigger: as AI agents autonomously browse, procure, and act on
+> web data, they need a way to *pay for verified truth* — not just raw content.
+> Lemma + x402 is the infrastructure layer that makes that possible for any
+> verifiable data: research reports, credentials, IoT sensor readings,
+> financial attestations, on-chain events, and beyond.
 
 ```
-Blog ──[200 OK]──▶ Agent
- │                   │
- │  X-Lemma-Attestation header     "Content is here,
- │  <link rel="lemma-attestation">  but can I trust it?"
- │                   │
- │                   ▼
- │              [$0.001 USDC]
- │                   │
- │                   ▼
- └──────────── Worker (/verify) ──▶ Verified Attributes + proof
-               "Yes — author, date, integrity all check out."
+Any content source ──[200 OK]──▶ AI Agent
+        │                              │
+        │  X-Lemma-Attestation header  "I have the data.
+        │  <link rel="lemma-attestation">  But can I trust it?"
+        │                              │
+        │                              ▼
+        │                       [$0.001 USDC]
+        │                              │
+        │                              ▼
+        └──────────── Worker (/verify) ──▶ Verified Attributes + ZK proof
+                      "Yes — author, date, integrity all check out."
 ```
+
+### Why this matters for AI agents
+
+When an AI agent acts autonomously — browsing the web, placing orders,
+making decisions based on external data — it cannot inherently trust what it
+reads. Today, agents either trust everything (risky) or verify nothing (useless).
+
+Lemma × x402 introduces a third path: **pay a micropayment, get a ZK-verified
+attestation**. No API keys. No sign-up. No billing form. Just HTTP.
+
+This works because:
+- **x402** turns any HTTP endpoint into a pay-per-use resource, with no
+  pre-registration required from either party
+- **Lemma** issues ZK proofs that attest to data attributes without revealing
+  the underlying content
+- Together, an agent can selectively verify what matters — and pay only for
+  the trust it needs
 
 ## Deployed Schemas & Circuits
 
 No local artifacts needed. These are already deployed on the network:
 
 | Type | ID | Purpose |
-|------|-----|---------|
+|------|-----|---------|\
 | Schema | `passthrough-v1` | Simple passthrough for any payload |
 | Circuit | `x402-payment-v1` | Proves on-chain payment (Monad Testnet) |
 | Schema | `blog-article-v1` | Blog article normalization |
@@ -164,7 +185,7 @@ pnpm agent:disclosure
 
 | Phase | Action | Result |
 |-------|--------|--------|
-| 1 | Agent fetches blog article normally | Content acquired (free) |
+| 1 | Agent fetches content normally | Data acquired (free) |
 | 2 | Agent displays content | Marked as **unverified** |
 | 3 | Agent discovers `X-Lemma-Attestation` header → pays $0.001 | Verified Attributes received |
 | 4 | Agent compares content hash with `integrity` attribute | Content marked as **verified** |
@@ -172,7 +193,7 @@ pnpm agent:disclosure
 ### Endpoints
 
 | Endpoint | Method | Purpose |
-|----------|--------|---------|
+|----------|--------|---------|\
 | `/verify/:hash` | GET | Provenance verification (main) — returns verified attributes + proof status |
 | `/query` | POST | Full query with BBS+ selective disclosure (advanced) |
 | `/` | GET | Health check |
@@ -218,9 +239,9 @@ the `integrity` attribute. If they match, the content is authentic.
 
 ---
 
-## Discovery: Integrate with Your Blog
+## Discovery: Integrate with Your Content Source
 
-Lemma uses a pull-based discovery model. Your blog signals that attestation
+Lemma uses a pull-based discovery model. Your content source signals that attestation
 is available; compatible agents pick it up automatically.
 
 ### A: HTTP Response Header (recommended)
@@ -235,10 +256,10 @@ X-Lemma-Schema: blog-article-v1
 Cloudflare Worker example:
 
 ```ts
-// In your blog's Worker or middleware
+// In your content source's Worker or middleware
 export default {
   async fetch(request, env) {
-    const response = await env.BLOG.fetch(request);
+    const response = await env.CONTENT.fetch(request);
     const newResponse = new Response(response.body, response);
     newResponse.headers.set(
       "X-Lemma-Attestation",
@@ -252,7 +273,7 @@ export default {
 
 ### B: HTML `<link>` meta tag
 
-Add one line to your blog template's `<head>`:
+Add one line to your page template's `<head>`:
 
 ```html
 <link
