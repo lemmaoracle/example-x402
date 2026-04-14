@@ -45,7 +45,7 @@ if (!WORKER_URL) {
 // In demo mode, the worker skips blockchain verification
 if (!AGENT_PRIVATE_KEY) {
   console.warn("Warning: AGENT_PRIVATE_KEY not set. Using demo mode with random key.");
-  console.warn("For real transactions, set AGENT_PRIVATE_KEY to a wallet with Monad testnet USDC.\n");
+  console.warn("For real transactions, set AGENT_PRIVATE_KEY to a wallet with Base Sepolia USDC.\n");
   // Generate 32 random bytes as hex
   const randomBytes = new Uint8Array(32);
   crypto.getRandomValues(randomBytes);
@@ -65,7 +65,7 @@ const signer = {
   address: account.address,
   signTypedData: account.signTypedData.bind(account),
 };
-client.register("eip155:10143", new ExactEvmScheme(signer));
+client.register("eip155:84532", new ExactEvmScheme(signer));
 
 const x402Fetch = wrapFetchWithPayment(fetch, client);
 

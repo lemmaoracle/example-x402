@@ -136,8 +136,8 @@ type VerifyResponseItem = Readonly<{
 // Constants
 // ---------------------------------------------------------------------------
 
-/** USDC contract address on Monad Testnet (chain ID 10143). */
-const USDC_MONAD_TESTNET = "0x534b2f3A21130d7a60830c2Df862319e593943A3";
+/** USDC contract address on Base Sepolia (chain ID 84532). */
+const USDC_BASE_SEPOLIA = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
 
 /** Default timeout for payment (60 seconds). */
 const DEFAULT_TIMEOUT_SECONDS = 60;
@@ -159,9 +159,9 @@ const verifyPaymentRequired = (
   accepts: [
     {
       scheme: "exact",
-      network: "eip155:10143",
+      network: "eip155:84532",
       amount: "1000", // $0.001 USDC (6 decimals)
-      asset: USDC_MONAD_TESTNET,
+      asset: USDC_BASE_SEPOLIA,
       payTo,
       maxTimeoutSeconds: DEFAULT_TIMEOUT_SECONDS,
       extra: {
@@ -191,9 +191,9 @@ const queryPaymentRequired = (
   accepts: [
     {
       scheme: "exact",
-      network: "eip155:10143",
+      network: "eip155:84532",
       amount: "1000", // $0.001 USDC (6 decimals)
-      asset: USDC_MONAD_TESTNET,
+      asset: USDC_BASE_SEPOLIA,
       payTo,
       maxTimeoutSeconds: DEFAULT_TIMEOUT_SECONDS,
       extra: {

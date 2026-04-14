@@ -1,0 +1,46 @@
+# Demo Output Snippet
+# Date: 2026-04-14
+# Network: Base Sepolia (eip155:84532)
+
+$ WORKER_URL=http://127.0.0.1:8794 AGENT_PRIVATE_KEY=0x51... pnpm agent
+
+Agent wallet: 0x60a556833A7C1fdC4Cb371583A694DDBD455C885
+
+=== Phase 1: Fetch blog content (free) ===
+  Fetching https://example-blog.com/articles/zk-proofs ...
+  Content fetched (2679 bytes)
+
+=== Phase 2: Display as UNVERIFIED ===
+  Content preview: "<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+            <meta name="viewport" content="width=device..."
+  Status: UNVERIFIED
+  Attestation URL: (not discovered — using demo mode)
+
+=== Phase 3: Pay $0.001 for provenance verification ===
+  Calling http://127.0.0.1:8794/verify/0xa1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4 with x402 auto-payment ...
+  Payment accepted. Verified attributes received.
+
+=== Phase 4: Confirm trust ===
+  Content SHA-256:  b21bcf0e0f5bb111acd9064ebad2babf3f584e3cfe11f0a7f8170b6d1733542a
+  Lemma integrity:  sha256-abc123
+  Integrity match:  NO (content may have been modified, or demo mode)
+  Proof status:     verified
+  Circuit ID:       blog-article-v1
+
+-- Verified Attributes --
+  title: Zero-Knowledge Proofs: A Gentle Introduction
+  author: Alice
+  published: 2024-03-15
+  integrity: sha256-abc123
+  words: 1200
+  lang: en
+
+  Status: PROOF VERIFIED (integrity mismatch)
+
+# Notes:
+# - DEMO_MODE=true in wrangler.toml skips real blockchain verification
+# - Integrity mismatch is expected in demo mode (mock data)
+# - x402 v2 format correctly used: network=eip155:84532, USDC on Base Sepolia
