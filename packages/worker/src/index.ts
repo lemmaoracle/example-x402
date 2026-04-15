@@ -218,6 +218,10 @@ const buildRoutes = (payTo: string) => ({
         price: "$0.001",
         network: "eip155:84532",
         payTo,
+        extra: {
+          name: "USDC",
+          version: "2",
+        },
       },
     ],
     description: "Verified provenance attributes for a Lemma-attested document",
@@ -236,6 +240,10 @@ const buildRoutes = (payTo: string) => ({
         price: "$0.001",
         network: "eip155:84532",
         payTo,
+        extra: {
+          name: "USDC",
+          version: "2",
+        },
       },
     ],
     description: "ZK-verified blog articles with BBS+ selective disclosure",
@@ -280,17 +288,22 @@ app.use("*", async (c, next) => {
     return next();
   }
 
-  const facilitatorClient = new HTTPFacilitatorClient({
-    url: c.env.FACILITATOR_URL.replace(/\/$/, ""),
-  });
+  try {
+    const facilitatorClient = new HTTPFacilitatorClient({
+      url: c.env.FACILITATOR_URL.replace(/\/$/, ""),
+    });
 
-  const resourceServer = new x402ResourceServer(facilitatorClient)
-    .register("eip155:84532", new ExactEvmScheme());
+    const resourceServer = new x402ResourceServer(facilitatorClient)
+      .register("eip155:84532", new ExactEvmScheme());
 
-  const routes = buildRoutes(c.env.PAY_TO_ADDRESS);
-  const middleware = paymentMiddleware(routes, resourceServer);
+    const routes = buildRoutes(c.env.PAY_TO_ADDRESS);
+    const middleware = paymentMiddleware(routes, resourceServer);
 
-  return middleware(c, next);
+    return await middleware(c, next);
+  } catch (err) {
+    console.error("x402 middleware error:", err);
+    return c.json({ error: "x402 middleware error", details: String(err) }, 500);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -307,35 +320,28 @@ app.get("/verify/:hash", async (c) => {
   if (demoMode) {
     data = mockVerifyData(hash);
   } else {
-    // Extract settlement proof from PAYMENT-RESPONSE header (set by middleware)
-    const settlement = extractSettlement(c.res.headers.get("PAYMENT-RESPONSE") ?? undefined);
-
-    const response = await fetch(`${apiBase}/verified-attributes/query`, {
+    // Query Lemma API without settlement proof first
+    // The middleware will add PAYMENT-RESPONSE header after settlement
+    const response = await fetch(`${apiBase}/v1/verified-attributes/query`, {
       method: "POST",
       headers: lemmaHeaders(apiKey),
       body: JSON.stringify({
+        attributes: [],
         docHash: hash,
-        ...(settlement ? {
-          disclosure: {
-            proof: settlement.proof,
-            inputs: settlement.inputs ?? [],
-          },
-        } : {}),
       }),
     });
 
     if (!response.ok) {
       const error = await response.text();
-      return c.json({ error }, response.status as 500);
+      console.error("Lemma API error:", error);
+      // Return empty results instead of error - settlement will happen after
+      data = { results: [], hasMore: false };
+    } else {
+      data = (await response.json()) as LemmaQueryResponse;
     }
-
-    data = (await response.json()) as LemmaQueryResponse;
   }
 
-  if (data.results.length === 0) {
-    return c.json({ error: "document_not_found", docHash: hash }, 404);
-  }
-
+  // Return results (may be empty if document not found yet)
   return c.json({ results: data.results.map(toVerifyItem) });
 });
 

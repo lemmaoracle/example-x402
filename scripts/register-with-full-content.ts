@@ -7,7 +7,10 @@
 
 import { schemas, define, prepare, disclose, documents, proofs } from "@lemmaoracle/sdk";
 
-const client = { apiBase: "https://workers.lemma.workers.dev" };
+const client = { 
+  apiBase: "https://workers.lemma.workers.dev",
+  apiKey: process.env.LEMMA_API_KEY,
+};
 
 async function registerArticleWithFullContent(article: {
   title: string;
@@ -21,7 +24,7 @@ async function registerArticleWithFullContent(article: {
   console.log(`Registering article: ${article.title}`);
   
   // Fetch the deployed schema
-  const schemaMeta = await schemas.getById(client, "blog-article");
+  const schemaMeta = await schemas.getById(client, "blog-article-v1");
   const schema = await define(schemaMeta);
   
   // Prepare with full content
@@ -202,5 +205,5 @@ const exampleArticle = {
   contentType: "html" as const,
 };
 
-// Uncomment to run
-// registerArticleWithFullContent(exampleArticle).catch(console.error);
+// Run
+registerArticleWithFullContent(exampleArticle).catch(console.error);

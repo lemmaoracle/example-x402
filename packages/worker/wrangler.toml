@@ -7,7 +7,7 @@ compatibility_flags = ["nodejs_compat"]
 LEMMA_API_BASE = "https://workers.lemma.workers.dev"
 FACILITATOR_URL = "https://x402-facilitator.lemma.workers.dev"
 PAY_TO_ADDRESS = "0x000000000000000000000000000000000000dEaD"  # Demo: burn address
-DEMO_MODE = "true"  # Skip blockchain verification for quick demos
+DEMO_MODE = "true"  # Set to false for real blockchain verification
 
 # Secrets (set via `npx wrangler secret put`):
 #   LEMMA_API_KEY   — Lemma API key (if required)

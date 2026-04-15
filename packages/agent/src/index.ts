@@ -165,39 +165,49 @@ const phase3_verify = async (
   console.log("\n=== Phase 3: Pay $0.001 for provenance verification ===");
   console.log(`  Calling ${attestationUrl} with x402 auto-payment ...`);
 
-  const response = await x402Fetch(attestationUrl, { method: "GET" });
+  try {
+    const response = await x402Fetch(attestationUrl, { method: "GET" });
 
-  if (!response.ok) {
-    const error = await response.text();
-    console.error(
-      `  Verification failed (${String(response.status)}):`,
-      error,
-    );
+    if (!response.ok) {
+      const error = await response.text();
+      console.error(
+        `  Verification failed (${String(response.status)}):`,
+        error,
+      );
+      console.log("  Response headers:");
+      response.headers.forEach((v, k) => console.log(`    ${k}: ${v}`));
+      return null;
+    }
+
+    const data = (await response.json()) as {
+      results: Array<{
+        docHash: string;
+        schema: string;
+        attributes: Record<string, unknown>;
+        proof: { status: string; circuitId?: string };
+      }>;
+    };
+
+    if (!data.results || data.results.length === 0) {
+      console.error("  No verification data returned");
+      return null;
+    }
+
+    const result = data.results[0];
+    console.log("  Payment accepted. Verified attributes received.");
+
+    return {
+      attributes: result.attributes,
+      proof: result.proof,
+      docHash: result.docHash,
+    };
+  } catch (err) {
+    console.error("  Error during verification:", err);
+    if (err instanceof Error) {
+      console.error("  Stack:", err.stack);
+    }
     return null;
   }
-
-  const data = (await response.json()) as {
-    results: Array<{
-      docHash: string;
-      schema: string;
-      attributes: Record<string, unknown>;
-      proof: { status: string; circuitId?: string };
-    }>;
-  };
-
-  if (!data.results || data.results.length === 0) {
-    console.error("  No verification data returned");
-    return null;
-  }
-
-  const result = data.results[0];
-  console.log("  Payment accepted. Verified attributes received.");
-
-  return {
-    attributes: result.attributes,
-    proof: result.proof,
-    docHash: result.docHash,
-  };
 };
 
 // ---------------------------------------------------------------------------
@@ -309,7 +319,7 @@ const main = async (): Promise<void> => {
   // Use discovered attestation URL, or fall back to demo URL
   const verifyUrl =
     attestationUrl ||
-    `${WORKER_URL}/verify/0xa1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4`;
+    `${WORKER_URL}/verify/0xea79591c06bc62df2401f9fe2aa5e49a21dbc3e9176d613ec80b02c5bfdeebb1`;
 
   const verifyResult = await phase3_verify(verifyUrl);
 
@@ -331,5 +341,8 @@ const main = async (): Promise<void> => {
 
 main().catch((err: unknown) => {
   console.error("Unexpected error:", err);
+  if (err instanceof Error) {
+    console.error("Stack:", err.stack);
+  }
   process.exit(1);
 });
