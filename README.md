@@ -1,30 +1,27 @@
-# Lemma × x402: World's First Agent Payment with ZK Proof
+# Lemma ZK attributes × x402 micropayments on Base Sepolia
 
-**The missing layer between AI agents and money: cryptographic proof of _who paid_, _why_, and _whether the result is real_.**
+**Agentic payments run on x402. Agentic trust runs on Lemma.**
 
-[Lemma](https://lemma.frame00.com) × [x402](https://x402.org) on Base Sepolia.
+Lemma is a trust layer that attaches ZK-proven attributes — org IDs, roles, permission scopes, compliance flags — to AI agents before they pay with x402.  
+You can drop it into your existing HTTP 402 payment flows so every agent-to-API or agent-to-agent payment cryptographically proves *who* is paying and *under what policy*.
+
+- Keep your existing x402 HTTP 402 flow and add Lemma's attribute checks in a few lines.
+- Prove the agent's issuer, role, and policy compliance as on-chain verifiable attributes.
+- Combine with Base Sepolia-based micropayments to let agents pay each other safely and autonomously.
 
 ---
 
-## The Problem: Agents Can Pay — But Can't Prove Anything
+## Why agents need more than a wallet
 
-AI agents can already browse the web, call APIs, and make payments. That
-part is solved. What isn't solved:
+Agents can pay — but recipients can't tell *who* paid or *under what authority*. Lemma fills this gap:
 
-- **Who is this agent?** — No verifiable identity. Any process can claim to
-  act on behalf of anyone.
-- **Was the payment legitimate?** — The agent paid, but was it authorized?
-  Was the amount correct? Can a third party verify this without trusting
-  the agent's self-report?
-- **Is the data it received real?** — The agent got a response, but content
-  can be forged, tampered with, or hallucinated. There is no cryptographic
-  link between payment and truth.
+| Without Lemma | With Lemma |
+|---|---|
+| Anonymous transfer | ZK-proven agent ID (issuer + role + policy) |
+| "Trust me" self-report | On-chain verifiable attributes |
+| No provenance on data received | Cryptographic integrity binding per response |
 
-Today's agent payments are _blind transfers_. Money moves, but nothing is
-proven. In a world where
-half the web may soon be agents,
-this is the bottleneck — not the payment itself, but the **trust vacuum**
-around it.
+Drop in a few lines of middleware, and every x402 payment carries machine-verifiable proof of identity, authorization, and data authenticity.
 
 ## What This Demo Proves
 
