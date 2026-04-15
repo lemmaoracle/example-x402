@@ -25,9 +25,9 @@ Drop in a few lines of middleware, and every x402 payment carries machine-verifi
 
 ## What This Demo Proves
 
-This is not a content paywall. It is a reference implementation of
-**ZK-verified agent transactions** — the first system where every payment
-carries cryptographic proof of identity, authorization, and data integrity.
+A reference implementation of **ZK-verified agent transactions** — an
+x402 payment flow where every request carries cryptographic proof of
+data authenticity and payment settlement.
 
 ```
 Agent ──[fetches data freely]──▶ Content Source
@@ -42,23 +42,22 @@ Agent ──[fetches data freely]──▶ Content Source
   ▼                                     │
   Lemma Worker ◀────────────────────────┘
   │
-  ├─ ZK proof: payment occurred on-chain (x402-payment-v1 circuit)
-  ├─ ZK proof: data attributes are authentic (blog-article-v1 circuit)
-  ├─ BBS+ selective disclosure: reveal only what's needed
-  └─ Agent ID: issuer/subject DIDs link agent to human principal
+  ├─ ZK proof: article attributes match a Poseidon commitment (blog-article-v1)
+  ├─ BBS+ selective disclosure: reveal only the fields the agent needs
+  └─ x402 settlement: facilitator verify → settle → on-chain confirmation
       │
       ▼
   Verified Result
-  "Author, date, integrity — all proven. Payment settled. Agent identified."
+  "Author, date, integrity — all proven. Payment settled."
 ```
 
-### Three Firsts in One Transaction
+### What each layer proves
 
-| Layer | What's proven | How |
+| Layer | What's proven | How (in this demo) |
 |-------|--------------|-----|
-| **Agent Identity** | The agent is authorized by a specific human principal | Issuer/subject DID pair + BBS+ signature chain |
-| **Payment Verification** | Payment actually occurred on-chain for the stated amount | `x402-payment-v1` ZK circuit — Poseidon commitment over tx data |
-| **Data Authenticity** | The received data hasn't been tampered with | `blog-article-v1` ZK circuit + SHA-256 integrity binding |
+| **Payment Settlement** | Payment occurred on-chain for the stated amount | x402 facilitator verify → settle on Base Sepolia |
+| **Data Authenticity** | Article attributes haven't been tampered with | `blog-article-v1` Poseidon commitment circuit + SHA-256 integrity binding |
+| **Selective Disclosure** | Only requested fields are revealed, nothing more | BBS+ signature over normalized attributes |
 
 A blog article is the entry-point example. The architecture generalizes to
 any verifiable data: credentials, sensor readings, financial attestations,
@@ -66,22 +65,16 @@ research outputs, on-chain events.
 
 ---
 
-## Why This Matters: Trust as Infrastructure
+## Why This Matters
 
-In a world of autonomous agents, trust must be both machine-verifiable and human-auditable. 
-Traditional approaches rely on social graphs where humans vouch for their agents, 
-but this makes trust _legible_ without being _verifiable_.
+With BBS+ selective disclosure, trust attributes are machine-verifiable
+without exposing the full credential:
 
-Lemma closes that gap. With BBS+ selective disclosure:
+- **Selective proof** — prove specific attributes (author, publication date, integrity hash) to a verifier without revealing the rest.
+- **Tamper detection** — SHA-256 content hash is bound to the Poseidon commitment; any modification breaks the proof.
+- **Pay-to-verify** — free tier gives you unverified content; $0.001 USDC unlocks the ZK-verified attribute set via x402.
 
-- Machine-readable trust attributes can be selectively disclosed — proven to a verifier without
-  revealing the full credential
-- Human-auditable context stays private — available only for review when
-  a trust decision needs deeper inspection
-- **Agent ID becomes cryptographically bound** to a human principal, not
-  just socially asserted
-
-The combination is: verifiable trust + cryptographic proof (Lemma) + native payment (x402) = **agents that can pay, prove, and be accountable**.
+The combination is: cryptographic proof of data (Lemma) + native payment (x402) = **agents that can pay, verify, and act on trusted data**.
 
 ---
 
@@ -556,6 +549,16 @@ demos.
 Testnet tokens:
 - **USDC**: [Circle Faucet](https://faucet.circle.com) — select Base Sepolia
 - **ETH** (gas): Use a Base Sepolia faucet (e.g., [Base Faucet](https://www.alchemy.com/faucets/base-sepolia))
+
+---
+
+## Roadmap
+
+This demo covers payment settlement, data authenticity, and selective disclosure. Lemma's schema design already carries `issuerId` / `subjectId` fields, which opens the door to:
+
+- **Agent DID binding** — derive `did:key` from the agent's signing key and bind it to `issuerId`, so every payment is cryptographically linked to a specific principal.
+- **Role and policy attributes** — attach org-level roles and permission scopes as verifiable attributes, enabling policy-gated payments.
+- **On-chain DID verification** — add a Circom constraint that checks `authorHash == poseidon(did:key)` inside the circuit, making identity part of the ZK proof itself.
 
 ---
 
