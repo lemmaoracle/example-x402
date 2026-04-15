@@ -42,9 +42,9 @@ Agent ──[fetches data freely]──▶ Content Source
   ▼                                     │
   Lemma Worker ◀────────────────────────┘
   │
-  ├─ ZK proof: article attributes match a Poseidon commitment (blog-article-v1)
-  ├─ BBS+ selective disclosure: reveal only the fields the agent needs
-  └─ x402 settlement: facilitator verify → settle → on-chain confirmation
+  ├─ Attribute proof: author, date, integrity verified (Poseidon commitment)
+  ├─ Payment proof: on-chain settlement confirmed (x402 facilitator)
+  └─ Minimal disclosure: only requested fields revealed (BBS+ signatures)
       │
       ▼
   Verified Result
@@ -55,9 +55,9 @@ Agent ──[fetches data freely]──▶ Content Source
 
 | Layer | What's proven | How (in this demo) |
 |-------|--------------|-----|
+| **Attribute Authenticity** | Author, date, and content integrity haven't been tampered with | `blog-article-v1` Poseidon commitment circuit + SHA-256 integrity binding |
 | **Payment Settlement** | Payment occurred on-chain for the stated amount | x402 facilitator verify → settle on Base Sepolia |
-| **Data Authenticity** | Article attributes haven't been tampered with | `blog-article-v1` Poseidon commitment circuit + SHA-256 integrity binding |
-| **Selective Disclosure** | Only requested fields are revealed, nothing more | BBS+ signature over normalized attributes |
+| **Minimal Exposure** | The verifier sees only the attributes it needs — nothing more | BBS+ signatures over normalized attributes |
 
 A blog article is the entry-point example. The architecture generalizes to
 any verifiable data: credentials, sensor readings, financial attestations,
@@ -67,14 +67,14 @@ research outputs, on-chain events.
 
 ## Why This Matters
 
-With BBS+ selective disclosure, trust attributes are machine-verifiable
-without exposing the full credential:
+Every x402 payment in this demo carries machine-verifiable proof — not
+just that money moved, but that specific attributes are authentic:
 
-- **Selective proof** — prove specific attributes (author, publication date, integrity hash) to a verifier without revealing the rest.
-- **Tamper detection** — SHA-256 content hash is bound to the Poseidon commitment; any modification breaks the proof.
-- **Pay-to-verify** — free tier gives you unverified content; $0.001 USDC unlocks the ZK-verified attribute set via x402.
+- **Verified provenance** — author, publication date, and content integrity are bound to a Poseidon commitment. Any tampering breaks the proof.
+- **Pay-to-verify** — content is freely accessible; $0.001 USDC unlocks the ZK-verified attribute set that proves the content is real.
+- **Need-to-know disclosure** — the verifier receives only the fields it requests. Full credentials stay private.
 
-The combination is: cryptographic proof of data (Lemma) + native payment (x402) = **agents that can pay, verify, and act on trusted data**.
+Cryptographic proof of data (Lemma) + native payment (x402) = **agents that can pay, verify, and act on trusted data**.
 
 ---
 
