@@ -26,8 +26,16 @@ import { HTTPFacilitatorClient, x402ResourceServer } from "@x402/core/server";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { createHash } from "crypto";
 
-const sha256 = (content: string): string =>
-  createHash("sha256").update(content).digest("hex");
+const sha256 = (content: string): string => {
+  // If the string starts with "0x", it might already be a hash
+  if (content.startsWith("0x") && content.length === 66) {
+    return content.slice(2);
+  }
+  
+  // Use a strictly normalized version of the content to handle any whitespace/newline differences
+  const normalized = content.replace(/\r\n/g, '\n').trim();
+  return createHash("sha256").update(normalized).digest("hex");
+};
 
 // ---------------------------------------------------------------------------
 // Types
@@ -162,7 +170,7 @@ const extractSettlement = (
 
 // Since the content of the blog changes every time we fetch it (probably due to dynamic tracking scripts or timestamps),
 // we use a fixed demo content for the local agent demo so the hashes match.
-const DEMO_CONTENT = "Zero-knowledge proofs allow one party to prove a statement is true without revealing any information beyond the validity of the statement itself.";
+const DEMO_CONTENT = `Artificial intelligence and blockchain technology are converging to create new possibilities for trust and automation.`;
 const DEMO_CONTENT_HASH = sha256(DEMO_CONTENT);
 
 const mockVerifyData = (hash: string): LemmaQueryResponse => ({

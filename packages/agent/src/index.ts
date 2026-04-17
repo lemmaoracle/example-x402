@@ -79,14 +79,34 @@ const x402Fetch = wrapFetchWithPayment(fetch, client);
 // ---------------------------------------------------------------------------
 // Utility: compute SHA-256 of content
 // ---------------------------------------------------------------------------
-const sha256 = (content: string): string =>
-  createHash("sha256").update(content).digest("hex");
+const sha256 = (content: string): string => {
+  // Use a strictly normalized version of the content to handle any whitespace/newline differences
+  const normalized = content.replace(/\r\n/g, '\n').trim();
+  return createHash("sha256").update(normalized).digest("hex");
+};
+
+// ---------------------------------------------------------------------------
+// Utility: sleep and typewrite for CLI effects
+// ---------------------------------------------------------------------------
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const typewrite = async (
+  text: string,
+  colorFn?: (str: string) => string,
+  minDelay = 5,
+  maxDelay = 20
+): Promise<void> => {
+  for (const char of text) {
+    process.stdout.write(colorFn ? colorFn(char) : char);
+    await sleep(Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay);
+  }
+};
 
 // ---------------------------------------------------------------------------
 // Phase 1: Fetch blog content freely
 // ---------------------------------------------------------------------------
 // Demo content (must match worker's DEMO_CONTENT)
-const DEMO_CONTENT = "Zero-knowledge proofs allow one party to prove a statement is true without revealing any information beyond the validity of the statement itself.";
+const DEMO_CONTENT = `Artificial intelligence and blockchain technology are converging to create new possibilities for trust and automation.`;
 
 const phase1_fetchContent = async (): Promise<{
   content: string;
@@ -131,13 +151,13 @@ const phase1_fetchContent = async (): Promise<{
 
     spinner.succeed(chalk.green(`Content fetched (${content.length} bytes)`));
     
-    // In demo mode, use the fixed demo content for hash matching
-    if (DEMO_MODE && !attestationUrl) {
+    // In demo mode, if we didn't discover an attestation URL, use the fixed demo content for hash matching
+    if (!attestationUrl && DEMO_MODE) {
       console.log(chalk.gray("  (Using demo content for hash matching)"));
       content = DEMO_CONTENT;
     }
   } catch {
-    // If the blog URL is unreachable (demo mode), use placeholder content
+    // If the blog URL is unreachable (e.g. standalone demo mode), use placeholder content
     spinner.warn(
       chalk.yellow("Blog URL unreachable — using demo content for illustration"),
     );
@@ -198,10 +218,10 @@ const phase3_verify = async (
       response.headers.forEach((v, k) => console.log(chalk.gray(`    ${k}: ${v}`)));
       
       // Dump the client's cached payment authorization if any
-      const clientAuth = await client.createAuthorizationHeader(
+      const clientAuth = await (client as any).createAuthorizationHeader(
         "exact", "eip155:84532", 
-        (await response.clone().json()).accepts[0]
-      ).catch(e => `Error creating auth: ${e}`);
+        (await response.clone().json() as any).accepts[0]
+      ).catch((e: any) => `Error creating auth: ${e}`);
       console.log(chalk.yellow(`\n  Debug - Payment Authorization that would be sent: ${clientAuth}`));
       
       return null;
@@ -239,13 +259,14 @@ const phase3_verify = async (
 // ---------------------------------------------------------------------------
 // Phase 4: Verify integrity and display as verified
 // ---------------------------------------------------------------------------
-const phase4_confirmTrust = (
+const phase4_confirmTrust = async (
   content: string,
   attributes: Record<string, unknown>,
   proof: { status: string; circuitId?: string },
   docHash: string,
-): void => {
+): Promise<void> => {
   console.log(chalk.bold.green("\n=== Phase 4: Confirm trust ==="));
+  await sleep(150);
 
   // Compare content hash with integrity attribute
   const contentHash = sha256(content);
@@ -256,23 +277,42 @@ const phase4_confirmTrust = (
       contentHash === integrity.replace(/^0x/, "") ||
       contentHash === integrity.replace(/^sha256-/, ""));
 
-  console.log(`  Content SHA-256:  ${chalk.cyan(contentHash)}`);
-  console.log(`  Lemma integrity:  ${chalk.cyan(integrity || "(not available)")}`);
+  process.stdout.write(`  Content SHA-256:  `);
+  await typewrite(contentHash, chalk.cyan, 2, 10);
+  console.log();
+  await sleep(100);
+
+  process.stdout.write(`  Lemma integrity:  `);
+  await typewrite(integrity || "(not available)", chalk.cyan, 2, 10);
+  console.log();
+  await sleep(150);
   
   const matchColor = integrityMatch ? chalk.green : chalk.yellow;
   const matchText = integrityMatch ? "YES" : "NO (content may have been modified, or demo mode)";
   console.log(`  Integrity match:  ${matchColor(matchText)}`);
+  await sleep(130);
   
   const proofColor = proof.status === "verified" ? chalk.green : chalk.yellow;
   console.log(`  Proof status:     ${proofColor(proof.status)}`);
+  await sleep(100);
   
   if (proof.circuitId) {
     console.log(`  Circuit ID:       ${chalk.cyan(proof.circuitId)}`);
+    await sleep(70);
   }
 
   console.log(chalk.bold("\n-- Verified Attributes --"));
+  await sleep(130);
   for (const [key, value] of Object.entries(attributes)) {
-    console.log(`  ${chalk.gray(key)}: ${chalk.white(String(value))}`);
+    process.stdout.write(`  ${chalk.gray(key)}: `);
+    const valueStr = String(value);
+    if (valueStr.length > 40) {
+      await typewrite(valueStr, chalk.white, 2, 10);
+    } else {
+      await typewrite(valueStr, chalk.white, 10, 30);
+    }
+    console.log();
+    await sleep(50);
   }
 
   const isFullyVerified = proof.status === "verified" && integrityMatch;
@@ -286,9 +326,11 @@ const phase4_confirmTrust = (
     statusTag = chalk.bgRed.white.bold(" PROOF PENDING ");
   }
 
+  await sleep(200);
   console.log(`\n  Status: ${statusTag}`);
   
   if (isFullyVerified) {
+    await sleep(100);
     console.log(
       chalk.green("  ✓ Content is authentic — author, date, and integrity all confirmed."),
     );
@@ -300,6 +342,7 @@ const phase4_confirmTrust = (
 // ---------------------------------------------------------------------------
 const advancedDisclosure = async (): Promise<void> => {
   console.log(chalk.bold.blue("\n=== Advanced: BBS+ Selective Disclosure (/query) ==="));
+  await sleep(150);
   
   const spinner = ora({
     text: chalk.gray(`Querying ${WORKER_URL}/query with x402 auto-payment ...`),
@@ -333,27 +376,57 @@ const advancedDisclosure = async (): Promise<void> => {
   };
 
   spinner.succeed(chalk.green(`Query successful`));
+  await sleep(100);
 
   console.log(
     chalk.cyan(`  ${String(result.results.length)} result(s) with disclosure.\n`),
   );
+  await sleep(130);
 
-  result.results.forEach((item, i) => {
+  for (let i = 0; i < result.results.length; i++) {
+    const item = result.results[i];
     console.log(chalk.bold(`  -- Result ${String(i + 1)} --`));
-    console.log(`    ${chalk.gray("docHash:")}    ${chalk.cyan(item.docHash)}`);
+    await sleep(70);
+    process.stdout.write(`    ${chalk.gray("docHash:")}    `);
+    await typewrite(item.docHash, chalk.cyan, 2, 10);
+    console.log();
+    await sleep(70);
     
     console.log(`    ${chalk.gray("attributes:")}`);
+    await sleep(50);
     for (const [k, v] of Object.entries(item.attributes)) {
-      console.log(`      ${chalk.gray(k)}: ${chalk.white(String(v))}`);
+      process.stdout.write(`      ${chalk.gray(k)}: `);
+      const vStr = String(v);
+      if (vStr.length > 40) {
+        await typewrite(vStr, chalk.white, 2, 10);
+      } else {
+        await typewrite(vStr, chalk.white, 7, 20);
+      }
+      console.log();
+      await sleep(30);
     }
     
     if (item.disclosed) {
+      await sleep(70);
       console.log(`    ${chalk.gray("disclosed:")}`);
+      await sleep(50);
       for (const [k, v] of Object.entries(item.disclosed)) {
-        console.log(`      ${chalk.gray(k)}: ${chalk.white(String(v))}`);
+        process.stdout.write(`      ${chalk.gray(k)}: `);
+        const vStr = String(v);
+        if (vStr.length > 40) {
+          await typewrite(vStr, chalk.white, 2, 10);
+        } else {
+          await typewrite(vStr, chalk.white, 7, 20);
+        }
+        console.log();
+        await sleep(30);
       }
     }
-  });
+    if (i < result.results.length - 1) {
+      console.log();
+      await sleep(150);
+    }
+  }
 };
 
 // ---------------------------------------------------------------------------
@@ -376,7 +449,7 @@ const main = async (): Promise<void> => {
 
   if (verifyResult) {
     // Phase 4: Confirm trust
-    phase4_confirmTrust(
+    await phase4_confirmTrust(
       content,
       verifyResult.attributes,
       verifyResult.proof,
