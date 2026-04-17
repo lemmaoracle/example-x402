@@ -195,12 +195,21 @@ const phase3_verify = async (
   try {
     const response = await x402Fetch(attestationUrl, { method: "GET" });
 
+    // Debug payload if failed
     if (!response.ok) {
       spinner.fail(chalk.red(`Verification failed (${String(response.status)})`));
       const error = await response.text();
       console.error(chalk.red(error));
       console.log(chalk.gray("  Response headers:"));
       response.headers.forEach((v, k) => console.log(chalk.gray(`    ${k}: ${v}`)));
+      
+      // Dump the client's cached payment authorization if any
+      const clientAuth = await client.createAuthorizationHeader(
+        "exact", "eip155:84532", 
+        (await response.clone().json()).accepts[0]
+      ).catch(e => `Error creating auth: ${e}`);
+      console.log(chalk.yellow(`\n  Debug - Payment Authorization that would be sent: ${clientAuth}`));
+      
       return null;
     }
 

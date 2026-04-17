@@ -4,8 +4,8 @@
   "scripts": {
     "dev:worker": "pnpm --filter @example-x402/worker dev",
     "deploy:worker": "pnpm --filter @example-x402/worker deploy",
-    "agent": "pnpm --filter @example-x402/agent start",
-    "agent:disclosure": "pnpm --filter @example-x402/agent start -- --with-disclosure",
+    "agent": "pnpm --silent --filter @example-x402/agent start",
+    "agent:disclosure": "pnpm --silent --filter @example-x402/agent start -- --with-disclosure",
     "check-balance": "tsx scripts/check-balance.ts",
     "register": "node scripts/register-lemma-artifacts.mjs",
     "register:schema": "tsx scripts/register-schema.ts",
