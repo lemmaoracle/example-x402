@@ -20,11 +20,21 @@ import { wrapFetchWithPayment } from "@x402/fetch";
 import { x402Client } from "@x402/core/client";
 import { ExactEvmScheme } from "@x402/evm/exact/client";
 import { privateKeyToAccount } from "viem/accounts";
+import chalk from "chalk";
+import ora from "ora";
+import spinners from "cli-spinners";
+import { config } from "dotenv";
+
+// Load .env from root workspace if we're running locally
+// Check if running from packages/agent (dev) or root (via pnpm filter)
+config({ path: process.cwd().endsWith("packages/agent") ? "../../.env" : ".env" });
 
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
-const WORKER_URL = process.env.WORKER_URL;
+const DEMO_MODE = process.env.DEMO_MODE === "true" || process.env.DEMO_MODE === "1";
+// Set a default port that matches wrangler's output if not provided
+const WORKER_URL = process.env.WORKER_URL || (DEMO_MODE ? "http://localhost:8787" : undefined);
 let AGENT_PRIVATE_KEY = process.env.AGENT_PRIVATE_KEY as
   | `0x${string}`
   | undefined;
@@ -33,17 +43,26 @@ const BLOG_URL =
 const WITH_DISCLOSURE = process.argv.includes("--with-disclosure");
 
 if (!WORKER_URL) {
-  console.error("Error: WORKER_URL environment variable is required.");
-  console.error("Set it to your deployed worker URL, e.g.:");
-  console.error(
-    "  WORKER_URL=https://lemma-query.your-subdomain.workers.dev pnpm agent",
-  );
-  process.exit(1);
+  if (!DEMO_MODE) {
+    console.error("Error: WORKER_URL environment variable is required.");
+    console.error("Set it to your deployed worker URL, e.g.:");
+    console.error(
+      "  WORKER_URL=https://lemma-query.your-subdomain.workers.dev pnpm agent",
+    );
+    process.exit(1);
+  } else {
+    console.warn("Warning: WORKER_URL not set. Using localhost for DEMO_MODE.");
+  }
 }
 
 // Generate a random key if not provided (demo mode)
 // In demo mode, the worker skips blockchain verification
 if (!AGENT_PRIVATE_KEY) {
+  if (!DEMO_MODE) {
+    console.error("Error: AGENT_PRIVATE_KEY environment variable is required.");
+    console.error("Set it to a wallet with Base Sepolia USDC, or use DEMO_MODE=true");
+    process.exit(1);
+  }
   console.warn("Warning: AGENT_PRIVATE_KEY not set. Using demo mode with random key.");
   console.warn("For real transactions, set AGENT_PRIVATE_KEY to a wallet with Base Sepolia USDC.\n");
   // Generate 32 random bytes as hex
@@ -83,8 +102,12 @@ const phase1_fetchContent = async (): Promise<{
   attestationUrl: string | null;
   schema: string | null;
 }> => {
-  console.log("=== Phase 1: Fetch blog content (free) ===");
-  console.log(`  Fetching ${BLOG_URL} ...`);
+  console.log(chalk.bold.cyan("\n=== Phase 1: Fetch blog content (free) ==="));
+  
+  const spinner = ora({
+    text: chalk.gray(`Fetching ${BLOG_URL} ...`),
+    spinner: spinners.dots,
+  }).start();
 
   let content: string;
   let attestationUrl: string | null = null;
@@ -115,11 +138,11 @@ const phase1_fetchContent = async (): Promise<{
       }
     }
 
-    console.log(`  Content fetched (${content.length} bytes)`);
+    spinner.succeed(chalk.green(`Content fetched (${content.length} bytes)`));
   } catch {
     // If the blog URL is unreachable (demo mode), use placeholder content
-    console.log(
-      "  Blog URL unreachable — using demo content for illustration",
+    spinner.warn(
+      chalk.yellow("Blog URL unreachable — using demo content for illustration"),
     );
     content =
       "Zero-knowledge proofs allow one party to prove a statement is true " +
@@ -139,16 +162,16 @@ const phase2_displayUnverified = (
   attestationUrl: string | null,
   schema: string | null,
 ): void => {
-  console.log("\n=== Phase 2: Display as UNVERIFIED ===");
+  console.log(chalk.bold.magenta("\n=== Phase 2: Display as UNVERIFIED ==="));
   console.log(
-    `  Content preview: "${content.slice(0, 120)}${content.length > 120 ? "..." : ""}"`,
+    chalk.gray(`  Content preview: "${content.slice(0, 120).replace(/\n/g, " ")}${content.length > 120 ? "..." : ""}"`),
   );
-  console.log("  Status: UNVERIFIED");
+  console.log(`  Status: ${chalk.bgRed.white.bold(" UNVERIFIED ")}`);
   console.log(
-    `  Attestation URL: ${attestationUrl || "(not discovered — using demo mode)"}`,
+    chalk.gray(`  Attestation URL: ${attestationUrl || "(not discovered — using demo mode)"}`),
   );
   if (schema) {
-    console.log(`  Schema: ${schema}`);
+    console.log(chalk.gray(`  Schema: ${schema}`));
   }
 };
 
@@ -162,20 +185,22 @@ const phase3_verify = async (
   proof: { status: string; circuitId?: string };
   docHash: string;
 } | null> => {
-  console.log("\n=== Phase 3: Pay $0.001 for provenance verification ===");
-  console.log(`  Calling ${attestationUrl} with x402 auto-payment ...`);
+  console.log(chalk.bold.yellow("\n=== Phase 3: Pay $0.001 for provenance verification ==="));
+  
+  const spinner = ora({
+    text: chalk.gray(`Calling ${attestationUrl} with x402 auto-payment ...`),
+    spinner: spinners.dots,
+  }).start();
 
   try {
     const response = await x402Fetch(attestationUrl, { method: "GET" });
 
     if (!response.ok) {
+      spinner.fail(chalk.red(`Verification failed (${String(response.status)})`));
       const error = await response.text();
-      console.error(
-        `  Verification failed (${String(response.status)}):`,
-        error,
-      );
-      console.log("  Response headers:");
-      response.headers.forEach((v, k) => console.log(`    ${k}: ${v}`));
+      console.error(chalk.red(error));
+      console.log(chalk.gray("  Response headers:"));
+      response.headers.forEach((v, k) => console.log(chalk.gray(`    ${k}: ${v}`)));
       return null;
     }
 
@@ -189,12 +214,12 @@ const phase3_verify = async (
     };
 
     if (!data.results || data.results.length === 0) {
-      console.error("  No verification data returned");
+      spinner.fail(chalk.red("No verification data returned"));
       return null;
     }
 
     const result = data.results[0];
-    console.log("  Payment accepted. Verified attributes received.");
+    spinner.succeed(chalk.green("Payment accepted. Verified attributes received."));
 
     return {
       attributes: result.attributes,
@@ -202,10 +227,8 @@ const phase3_verify = async (
       docHash: result.docHash,
     };
   } catch (err) {
-    console.error("  Error during verification:", err);
-    if (err instanceof Error) {
-      console.error("  Stack:", err.stack);
-    }
+    spinner.fail(chalk.red("Error during verification"));
+    console.error(chalk.red(String(err)));
     return null;
   }
 };
@@ -219,7 +242,7 @@ const phase4_confirmTrust = (
   proof: { status: string; circuitId?: string },
   docHash: string,
 ): void => {
-  console.log("\n=== Phase 4: Confirm trust ===");
+  console.log(chalk.bold.green("\n=== Phase 4: Confirm trust ==="));
 
   // Compare content hash with integrity attribute
   const contentHash = sha256(content);
@@ -229,29 +252,41 @@ const phase4_confirmTrust = (
     (contentHash === integrity ||
       contentHash === integrity.replace(/^0x/, ""));
 
-  console.log(`  Content SHA-256:  ${contentHash}`);
-  console.log(`  Lemma integrity:  ${integrity || "(not available)"}`);
-  console.log(
-    `  Integrity match:  ${integrityMatch ? "YES" : "NO (content may have been modified, or demo mode)"}`,
-  );
-  console.log(`  Proof status:     ${proof.status}`);
+  console.log(`  Content SHA-256:  ${chalk.cyan(contentHash)}`);
+  console.log(`  Lemma integrity:  ${chalk.cyan(integrity || "(not available)")}`);
+  
+  const matchColor = integrityMatch ? chalk.green : chalk.yellow;
+  const matchText = integrityMatch ? "YES" : "NO (content may have been modified, or demo mode)";
+  console.log(`  Integrity match:  ${matchColor(matchText)}`);
+  
+  const proofColor = proof.status === "verified" ? chalk.green : chalk.yellow;
+  console.log(`  Proof status:     ${proofColor(proof.status)}`);
+  
   if (proof.circuitId) {
-    console.log(`  Circuit ID:       ${proof.circuitId}`);
+    console.log(`  Circuit ID:       ${chalk.cyan(proof.circuitId)}`);
   }
 
-  console.log("\n-- Verified Attributes --");
+  console.log(chalk.bold("\n-- Verified Attributes --"));
   for (const [key, value] of Object.entries(attributes)) {
-    console.log(`  ${key}: ${String(value)}`);
+    console.log(`  ${chalk.gray(key)}: ${chalk.white(String(value))}`);
   }
 
   const isFullyVerified = proof.status === "verified" && integrityMatch;
 
-  console.log(
-    `\n  Status: ${isFullyVerified ? "VERIFIED" : proof.status === "verified" ? "PROOF VERIFIED (integrity mismatch)" : "PROOF PENDING"}`,
-  );
+  let statusTag;
+  if (isFullyVerified) {
+    statusTag = chalk.bgGreen.black.bold(" VERIFIED ");
+  } else if (proof.status === "verified") {
+    statusTag = chalk.bgYellow.black.bold(" PROOF VERIFIED (integrity mismatch) ");
+  } else {
+    statusTag = chalk.bgRed.white.bold(" PROOF PENDING ");
+  }
+
+  console.log(`\n  Status: ${statusTag}`);
+  
   if (isFullyVerified) {
     console.log(
-      "  Content is authentic — author, date, and integrity all confirmed.",
+      chalk.green("  ✓ Content is authentic — author, date, and integrity all confirmed."),
     );
   }
 };
@@ -260,8 +295,12 @@ const phase4_confirmTrust = (
 // Advanced: BBS+ selective disclosure via /query
 // ---------------------------------------------------------------------------
 const advancedDisclosure = async (): Promise<void> => {
-  console.log("\n=== Advanced: BBS+ Selective Disclosure (/query) ===");
-  console.log(`  Querying ${WORKER_URL}/query with x402 auto-payment ...`);
+  console.log(chalk.bold.blue("\n=== Advanced: BBS+ Selective Disclosure (/query) ==="));
+  
+  const spinner = ora({
+    text: chalk.gray(`Querying ${WORKER_URL}/query with x402 auto-payment ...`),
+    spinner: spinners.dots,
+  }).start();
 
   const response = await x402Fetch(`${WORKER_URL}/query`, {
     method: "POST",
@@ -272,11 +311,9 @@ const advancedDisclosure = async (): Promise<void> => {
   });
 
   if (!response.ok) {
+    spinner.fail(chalk.red(`Query failed (${String(response.status)})`));
     const error = await response.text();
-    console.error(
-      `  Query failed (${String(response.status)}):`,
-      error,
-    );
+    console.error(chalk.red(error));
     return;
   }
 
@@ -291,16 +328,26 @@ const advancedDisclosure = async (): Promise<void> => {
     hasMore: boolean;
   };
 
+  spinner.succeed(chalk.green(`Query successful`));
+
   console.log(
-    `  ${String(result.results.length)} result(s) with disclosure.\n`,
+    chalk.cyan(`  ${String(result.results.length)} result(s) with disclosure.\n`),
   );
 
   result.results.forEach((item, i) => {
-    console.log(`  -- Result ${String(i + 1)} --`);
-    console.log(`    docHash:    ${item.docHash}`);
-    console.log(`    attributes:`, item.attributes);
+    console.log(chalk.bold(`  -- Result ${String(i + 1)} --`));
+    console.log(`    ${chalk.gray("docHash:")}    ${chalk.cyan(item.docHash)}`);
+    
+    console.log(`    ${chalk.gray("attributes:")}`);
+    for (const [k, v] of Object.entries(item.attributes)) {
+      console.log(`      ${chalk.gray(k)}: ${chalk.white(String(v))}`);
+    }
+    
     if (item.disclosed) {
-      console.log(`    disclosed:`, item.disclosed);
+      console.log(`    ${chalk.gray("disclosed:")}`);
+      for (const [k, v] of Object.entries(item.disclosed)) {
+        console.log(`      ${chalk.gray(k)}: ${chalk.white(String(v))}`);
+      }
     }
   });
 };

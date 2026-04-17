@@ -20,6 +20,9 @@ const PROJECT_ROOT = path.resolve(__dirname, "..");
 // Load environment variables
 dotenv.config({ path: path.join(PROJECT_ROOT, ".env") });
 
+import { config } from "dotenv";
+config();
+
 const LEMMA_API_KEY = process.env.LEMMA_API_KEY;
 const PINATA_API_KEY = process.env.PINATA_API_KEY;
 const PINATA_SECRET_API_KEY = process.env.PINATA_SECRET_API_KEY;

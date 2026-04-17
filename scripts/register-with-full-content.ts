@@ -5,10 +5,12 @@
  * for AI agents to access after payment.
  */
 
+import { config } from "dotenv";
 import { schemas, define, prepare, disclose, documents, proofs } from "@lemmaoracle/sdk";
+config();
 
 const client = { 
-  apiBase: "https://workers.lemma.workers.dev",
+  apiBase: process.env.LEMMA_API_BASE || "https://workers.lemma.workers.dev",
   apiKey: process.env.LEMMA_API_KEY,
 };
 

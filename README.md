@@ -91,10 +91,40 @@ No local artifacts needed. These are already deployed on the network:
 
 ## Demo Steps (5 minutes)
 
-### Step 1: Register Content
+### Step 1: Start the Resource Worker
 
-Register a blog article with conditional disclosure (requires payment to
-access full content):
+```bash
+# Optional: Set DEMO_MODE=false in packages/worker/.dev.vars if you want full on-chain verification
+pnpm dev:worker
+```
+
+The worker runs at `http://localhost:8787`.
+
+### Step 2: Run the agent
+
+In another terminal, run the agent script:
+
+```bash
+pnpm agent
+# 4-phase flow: fetch → unverified → pay → verified
+```
+
+For the advanced BBS+ selective disclosure flow:
+
+```bash
+pnpm agent:disclosure
+# Additionally queries POST /query for disclosed title/body
+```
+
+---
+
+## Advanced: Registering Content with Full Disclosure
+
+If you want to register your own custom article with full HTML/Markdown content for AI agents to access after payment, you can use the content registration script.
+
+### 1. Register Content
+
+Modify `scripts/register-with-full-content.ts` with your custom article data, then run:
 
 ```bash
 pnpm register:content
@@ -105,21 +135,11 @@ This creates:
 - **Free tier proof**: verifiable without payment (title, author, date)
 - **Paid tier proof**: requires `x402-payment-v1` circuit proof (body, full content)
 
-The script outputs a `docHash` — you will use this in Step 3.
+The script outputs a `docHash` — you can use this in manual curl tests.
 
-> **Note**: Skip this step if you already have a registered docHash.
+### 2. Test the Custom Content x402 Flow
 
-### Step 2: Start the Resource Worker
-
-```bash
-pnpm dev:worker
-```
-
-The worker runs at `http://localhost:8787`.
-
-### Step 3: Test the x402 Flow
-
-#### 3a. Unauthenticated access → 402 Payment Required
+#### 2a. Unauthenticated access → 402 Payment Required
 
 ```bash
 curl -s http://localhost:8787/verify/<your-docHash> | jq
@@ -134,7 +154,7 @@ Response:
 }
 ```
 
-#### 3b. Paid access → 200 OK with verified provenance
+#### 2b. Paid access → 200 OK with verified provenance
 
 Generate an x402 payment (see [x402 docs](https://docs.x402.org/)), then:
 
@@ -242,6 +262,16 @@ pnpm deploy:worker
 Update `WORKER_URL` in `.env` with the deployed URL.
 
 ### 4. Run the agent
+
+In one terminal, start the worker:
+
+```bash
+pnpm dev:worker
+```
+
+デフォルトは `DEMO_MODE=false`（実際のオンチェーン検証）です。クイックデモの場合は `packages/worker/.dev.vars` で `DEMO_MODE=true` に設定してください。
+
+In another terminal, run the agent script:
 
 ```bash
 pnpm agent

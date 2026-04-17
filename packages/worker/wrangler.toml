@@ -3,6 +3,9 @@ main = "src/index.ts"
 compatibility_date = "2024-12-30"
 compatibility_flags = ["nodejs_compat"]
 
+[dev]
+port = 8787
+
 [vars]
 LEMMA_API_BASE = "https://workers.lemma.workers.dev"
 FACILITATOR_URL = "https://x402-facilitator.lemma.workers.dev"
