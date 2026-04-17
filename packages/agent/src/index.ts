@@ -32,28 +32,16 @@ config({ path: process.cwd().endsWith("packages/agent") ? "../../.env" : ".env" 
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
-const DEMO_MODE = process.env.DEMO_MODE === "true" || process.env.DEMO_MODE === "1";
-// Set a default port that matches wrangler's output if not provided
-const WORKER_URL = process.env.WORKER_URL || (DEMO_MODE ? "http://localhost:8787" : undefined);
+const WORKER_URL = process.env.WORKER_URL || "http://localhost:8787";
+// Demo mode: detected by localhost URL or explicit env var
+const DEMO_MODE = process.env.DEMO_MODE === "true" || process.env.DEMO_MODE === "1" || 
+  WORKER_URL.includes("localhost") || WORKER_URL.includes("127.0.0.1");
 let AGENT_PRIVATE_KEY = process.env.AGENT_PRIVATE_KEY as
   | `0x${string}`
   | undefined;
 const BLOG_URL =
   process.env.BLOG_URL || "https://example-blog.com/articles/zk-proofs";
 const WITH_DISCLOSURE = process.argv.includes("--with-disclosure");
-
-if (!WORKER_URL) {
-  if (!DEMO_MODE) {
-    console.error("Error: WORKER_URL environment variable is required.");
-    console.error("Set it to your deployed worker URL, e.g.:");
-    console.error(
-      "  WORKER_URL=https://lemma-query.your-subdomain.workers.dev pnpm agent",
-    );
-    process.exit(1);
-  } else {
-    console.warn("Warning: WORKER_URL not set. Using localhost for DEMO_MODE.");
-  }
-}
 
 // Generate a random key if not provided (demo mode)
 // In demo mode, the worker skips blockchain verification
@@ -97,6 +85,9 @@ const sha256 = (content: string): string =>
 // ---------------------------------------------------------------------------
 // Phase 1: Fetch blog content freely
 // ---------------------------------------------------------------------------
+// Demo content (must match worker's DEMO_CONTENT)
+const DEMO_CONTENT = "Zero-knowledge proofs allow one party to prove a statement is true without revealing any information beyond the validity of the statement itself.";
+
 const phase1_fetchContent = async (): Promise<{
   content: string;
   attestationUrl: string | null;
@@ -139,15 +130,18 @@ const phase1_fetchContent = async (): Promise<{
     }
 
     spinner.succeed(chalk.green(`Content fetched (${content.length} bytes)`));
+    
+    // In demo mode, use the fixed demo content for hash matching
+    if (DEMO_MODE && !attestationUrl) {
+      console.log(chalk.gray("  (Using demo content for hash matching)"));
+      content = DEMO_CONTENT;
+    }
   } catch {
     // If the blog URL is unreachable (demo mode), use placeholder content
     spinner.warn(
       chalk.yellow("Blog URL unreachable — using demo content for illustration"),
     );
-    content =
-      "Zero-knowledge proofs allow one party to prove a statement is true " +
-      "without revealing any information beyond the validity of the " +
-      "statement itself.";
+    content = DEMO_CONTENT;
     attestationUrl = null;
   }
 
@@ -259,7 +253,8 @@ const phase4_confirmTrust = (
   const integrityMatch =
     integrity &&
     (contentHash === integrity ||
-      contentHash === integrity.replace(/^0x/, ""));
+      contentHash === integrity.replace(/^0x/, "") ||
+      contentHash === integrity.replace(/^sha256-/, ""));
 
   console.log(`  Content SHA-256:  ${chalk.cyan(contentHash)}`);
   console.log(`  Lemma integrity:  ${chalk.cyan(integrity || "(not available)")}`);

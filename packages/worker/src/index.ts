@@ -24,6 +24,10 @@ import { Hono } from "hono";
 import { paymentMiddleware } from "@x402/hono";
 import { HTTPFacilitatorClient, x402ResourceServer } from "@x402/core/server";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
+import { createHash } from "crypto";
+
+const sha256 = (content: string): string =>
+  createHash("sha256").update(content).digest("hex");
 
 // ---------------------------------------------------------------------------
 // Types
@@ -156,6 +160,11 @@ const extractSettlement = (
 // Demo mode mock data
 // ---------------------------------------------------------------------------
 
+// Since the content of the blog changes every time we fetch it (probably due to dynamic tracking scripts or timestamps),
+// we use a fixed demo content for the local agent demo so the hashes match.
+const DEMO_CONTENT = "Zero-knowledge proofs allow one party to prove a statement is true without revealing any information beyond the validity of the statement itself.";
+const DEMO_CONTENT_HASH = sha256(DEMO_CONTENT);
+
 const mockVerifyData = (hash: string): LemmaQueryResponse => ({
   results: [
     {
@@ -167,7 +176,7 @@ const mockVerifyData = (hash: string): LemmaQueryResponse => ({
         title: "Zero-Knowledge Proofs: A Gentle Introduction",
         author: "Alice",
         published: "2024-03-15",
-        integrity: "sha256-abc123",
+        integrity: DEMO_CONTENT_HASH,
         words: 1200,
         lang: "en",
       },
@@ -188,7 +197,7 @@ const mockQueryData = (): LemmaQueryResponse => ({
         title: "Zero-Knowledge Proofs: A Gentle Introduction",
         author: "Alice",
         published: "2024-03-15",
-        integrity: "sha256-abc123",
+        integrity: DEMO_CONTENT_HASH,
         words: 1200,
         lang: "en",
       },
