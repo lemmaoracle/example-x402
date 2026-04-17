@@ -9,7 +9,12 @@ You can drop it into your existing HTTP 402 payment flows so every agent-to-API 
 - Prove the agent's issuer, role, and policy compliance as on-chain verifiable attributes.
 - Combine with Base Sepolia-based micropayments to let agents pay each other safely and autonomously.
 
----
+<div align="center">
+  
+![Terminal demo showing the agent fetching content, making a micropayment via x402, and receiving verified attributes](assets/terminal.gif)
+
+*Demo: Agent fetches content → discovers attestation → pays $0.001 via x402 → receives ZK-verified attributes*
+</div>
 
 ## Why agents need more than a wallet
 
