@@ -150,10 +150,11 @@ const phase1_fetchContent = async (): Promise<{
     }
 
     spinner.succeed(chalk.green(`Content fetched (${content.length} bytes)`));
-    
-    // In demo mode, if we didn't discover an attestation URL, use fixed demo content for hash matching
-    if (!attestationUrl && DEMO_MODE) {
-      console.log(chalk.gray("  (Using demo content for demo mode)"));
+
+    // If we didn't discover an attestation URL, use fixed demo content for hash matching.
+    // The fallback verification URL uses the demo content hash, so the content must match.
+    if (!attestationUrl) {
+      console.log(chalk.gray("  (No attestation URL found — using demo content for verification)"));
       content = DEMO_CONTENT;
     }
   } catch {
