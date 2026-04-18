@@ -39,8 +39,7 @@ let AGENT_PRIVATE_KEY = process.env.AGENT_PRIVATE_KEY as
 const BLOG_URL =
   process.env.BLOG_URL || "https://example-blog.com/articles/zk-proofs";
 const WITH_DISCLOSURE = process.argv.includes("--with-disclosure");
-const SCREENSHOT_MODE = process.argv.includes("--screenshot-mode") ||
-  process.env.DEMO_MODE === "true" || process.env.DEMO_MODE === "1";
+const DEMO_MODE = process.env.DEMO_MODE === "true" || process.env.DEMO_MODE === "1";
 
 if (!WORKER_URL) {
   console.error("Error: WORKER_URL environment variable is required.");
@@ -51,28 +50,15 @@ if (!WORKER_URL) {
   process.exit(1);
 }
 
-// Require AGENT_PRIVATE_KEY unless in screenshot mode
+// Require AGENT_PRIVATE_KEY (no demo mode fallback)
 if (!AGENT_PRIVATE_KEY) {
-  if (SCREENSHOT_MODE) {
-    console.warn("Warning: AGENT_PRIVATE_KEY not set. Using screenshot mode with random key.");
-    console.warn("For real transactions, set AGENT_PRIVATE_KEY to a wallet with Base Sepolia USDC.\n");
-    // Generate 32 random bytes as hex
-    const randomBytes = new Uint8Array(32);
-    crypto.getRandomValues(randomBytes);
-    AGENT_PRIVATE_KEY = `0x${Array.from(randomBytes)
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("")}` as `0x${string}`;
-  } else {
-    console.error("Error: AGENT_PRIVATE_KEY environment variable is required.");
-    console.error("Set it to a wallet with Base Sepolia USDC.");
-    console.error("");
-    console.error("Get test USDC from: https://faucet.circle.com (select Base Sepolia)");
-    console.error("Get test ETH for gas from: https://www.alchemy.com/faucets/base-sepolia");
-    console.error("");
-    console.error("For a quick demo without wallet setup, use --screenshot-mode:");
-    console.error("  pnpm agent --screenshot-mode");
-    process.exit(1);
-  }
+  console.error("Error: AGENT_PRIVATE_KEY environment variable is required.");
+  console.error("Set it to a wallet with Base Sepolia USDC.");
+  console.error("");
+  console.error("Get test USDC from: https://faucet.circle.com (select Base Sepolia)");
+  console.error("");
+  console.error("For local testing without real payments, set DEMO_MODE=true in worker config.");
+  process.exit(1);
 }
 
 // ---------------------------------------------------------------------------
@@ -165,9 +151,9 @@ const phase1_fetchContent = async (): Promise<{
 
     spinner.succeed(chalk.green(`Content fetched (${content.length} bytes)`));
     
-    // In screenshot mode, if we didn't discover an attestation URL, use fixed demo content for hash matching
-    if (!attestationUrl && SCREENSHOT_MODE) {
-      console.log(chalk.gray("  (Using demo content for screenshot mode)"));
+    // In demo mode, if we didn't discover an attestation URL, use fixed demo content for hash matching
+    if (!attestationUrl && DEMO_MODE) {
+      console.log(chalk.gray("  (Using demo content for demo mode)"));
       content = DEMO_CONTENT;
     }
   } catch {
