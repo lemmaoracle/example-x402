@@ -233,7 +233,7 @@ const buildRoutes = (payTo: string) => ({
       {
         scheme: "exact" as const,
         price: "$0.001",
-        network: "eip155:84532",
+        network: "eip155:84532" as const,
         payTo,
         extra: {
           name: "USDC",
@@ -255,7 +255,7 @@ const buildRoutes = (payTo: string) => ({
       {
         scheme: "exact" as const,
         price: "$0.001",
-        network: "eip155:84532",
+        network: "eip155:84532" as const,
         payTo,
         extra: {
           name: "USDC",
@@ -306,8 +306,18 @@ app.use("*", async (c, next) => {
   }
 
   try {
+    const apiKey = c.env.LEMMA_API_KEY;
     const facilitatorClient = new HTTPFacilitatorClient({
       url: c.env.FACILITATOR_URL.replace(/\/$/, ""),
+      ...(apiKey
+        ? {
+            createAuthHeaders: async () => ({
+              verify: { Authorization: `Bearer ${apiKey}` },
+              settle: { Authorization: `Bearer ${apiKey}` },
+              supported: { Authorization: `Bearer ${apiKey}` },
+            }),
+          }
+        : {}),
     });
 
     const resourceServer = new x402ResourceServer(facilitatorClient)
