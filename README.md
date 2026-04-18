@@ -222,7 +222,7 @@ Client Request
 ### Endpoints
 
 | Endpoint | Method | Purpose |
-|----------|--------|---------|\
+|----------|--------|---------|
 | `/verify/:hash` | GET | Provenance verification (main) — verified attributes + proof status |
 | `/query` | POST | Full query with BBS+ selective disclosure (advanced) |
 | `/` | GET | Health check |
@@ -274,7 +274,7 @@ In one terminal, start the worker:
 pnpm dev:worker
 ```
 
-デフォルトは `DEMO_MODE=false`（実際のオンチェーン検証）です。クイックデモの場合は `packages/worker/.dev.vars` で `DEMO_MODE=true` に設定してください。
+> **Note:** By default, the worker runs with real x402 payment verification. For a quick demo without wallet setup, set `DEMO_MODE=true` in `packages/worker/.dev.vars`.
 
 In another terminal, run the agent script:
 

@@ -32,33 +32,47 @@ config({ path: process.cwd().endsWith("packages/agent") ? "../../.env" : ".env" 
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
-const WORKER_URL = process.env.WORKER_URL || "http://localhost:8787";
-// Demo mode: detected by localhost URL or explicit env var
-const DEMO_MODE = process.env.DEMO_MODE === "true" || process.env.DEMO_MODE === "1" || 
-  WORKER_URL.includes("localhost") || WORKER_URL.includes("127.0.0.1");
+const WORKER_URL = process.env.WORKER_URL;
 let AGENT_PRIVATE_KEY = process.env.AGENT_PRIVATE_KEY as
   | `0x${string}`
   | undefined;
 const BLOG_URL =
   process.env.BLOG_URL || "https://example-blog.com/articles/zk-proofs";
 const WITH_DISCLOSURE = process.argv.includes("--with-disclosure");
+const SCREENSHOT_MODE = process.argv.includes("--screenshot-mode") ||
+  process.env.DEMO_MODE === "true" || process.env.DEMO_MODE === "1";
 
-// Generate a random key if not provided (demo mode)
-// In demo mode, the worker skips blockchain verification
+if (!WORKER_URL) {
+  console.error("Error: WORKER_URL environment variable is required.");
+  console.error("Set it to your deployed worker URL, e.g.:");
+  console.error(
+    "  WORKER_URL=https://lemma-query.your-subdomain.workers.dev pnpm agent",
+  );
+  process.exit(1);
+}
+
+// Require AGENT_PRIVATE_KEY unless in screenshot mode
 if (!AGENT_PRIVATE_KEY) {
-  if (!DEMO_MODE) {
+  if (SCREENSHOT_MODE) {
+    console.warn("Warning: AGENT_PRIVATE_KEY not set. Using screenshot mode with random key.");
+    console.warn("For real transactions, set AGENT_PRIVATE_KEY to a wallet with Base Sepolia USDC.\n");
+    // Generate 32 random bytes as hex
+    const randomBytes = new Uint8Array(32);
+    crypto.getRandomValues(randomBytes);
+    AGENT_PRIVATE_KEY = `0x${Array.from(randomBytes)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("")}` as `0x${string}`;
+  } else {
     console.error("Error: AGENT_PRIVATE_KEY environment variable is required.");
-    console.error("Set it to a wallet with Base Sepolia USDC, or use DEMO_MODE=true");
+    console.error("Set it to a wallet with Base Sepolia USDC.");
+    console.error("");
+    console.error("Get test USDC from: https://faucet.circle.com (select Base Sepolia)");
+    console.error("Get test ETH for gas from: https://www.alchemy.com/faucets/base-sepolia");
+    console.error("");
+    console.error("For a quick demo without wallet setup, use --screenshot-mode:");
+    console.error("  pnpm agent --screenshot-mode");
     process.exit(1);
   }
-  console.warn("Warning: AGENT_PRIVATE_KEY not set. Using demo mode with random key.");
-  console.warn("For real transactions, set AGENT_PRIVATE_KEY to a wallet with Base Sepolia USDC.\n");
-  // Generate 32 random bytes as hex
-  const randomBytes = new Uint8Array(32);
-  crypto.getRandomValues(randomBytes);
-  AGENT_PRIVATE_KEY = `0x${Array.from(randomBytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("")}` as `0x${string}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -151,13 +165,13 @@ const phase1_fetchContent = async (): Promise<{
 
     spinner.succeed(chalk.green(`Content fetched (${content.length} bytes)`));
     
-    // In demo mode, if we didn't discover an attestation URL, use the fixed demo content for hash matching
-    if (!attestationUrl && DEMO_MODE) {
-      console.log(chalk.gray("  (Using demo content for hash matching)"));
+    // In screenshot mode, if we didn't discover an attestation URL, use fixed demo content for hash matching
+    if (!attestationUrl && SCREENSHOT_MODE) {
+      console.log(chalk.gray("  (Using demo content for screenshot mode)"));
       content = DEMO_CONTENT;
     }
   } catch {
-    // If the blog URL is unreachable (e.g. standalone demo mode), use placeholder content
+    // If the blog URL is unreachable (e.g. standalone screenshot mode), use placeholder content
     spinner.warn(
       chalk.yellow("Blog URL unreachable — using demo content for illustration"),
     );
@@ -212,17 +226,24 @@ const phase3_verify = async (
     // Debug payload if failed
     if (!response.ok) {
       spinner.fail(chalk.red(`Verification failed (${String(response.status)})`));
-      const error = await response.text();
-      console.error(chalk.red(error));
+      
+      // Read body once, parse twice (text for logging, JSON for debug)
+      const errorText = await response.text();
+      let errorJson: Record<string, unknown> | null = null;
+      try { errorJson = JSON.parse(errorText); } catch { /* non-JSON response */ }
+      
+      console.error(chalk.red(errorText));
       console.log(chalk.gray("  Response headers:"));
       response.headers.forEach((v, k) => console.log(chalk.gray(`    ${k}: ${v}`)));
       
-      // Dump the client's cached payment authorization if any
-      const clientAuth = await (client as any).createAuthorizationHeader(
-        "exact", "eip155:84532", 
-        (await response.clone().json() as any).accepts[0]
-      ).catch((e: any) => `Error creating auth: ${e}`);
-      console.log(chalk.yellow(`\n  Debug - Payment Authorization that would be sent: ${clientAuth}`));
+      // Dump the client's cached payment authorization if available
+      if (errorJson && Array.isArray(errorJson.accepts) && errorJson.accepts[0]) {
+        const clientAuth = await (client as any).createAuthorizationHeader(
+          "exact", "eip155:84532",
+          errorJson.accepts[0]
+        ).catch((e: unknown) => `Error creating auth: ${e}`);
+        console.log(chalk.yellow(`\n  Debug - Payment Authorization that would be sent: ${clientAuth}`));
+      }
       
       return null;
     }

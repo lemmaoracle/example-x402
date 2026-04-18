@@ -10,7 +10,8 @@ port = 8787
 LEMMA_API_BASE = "https://workers.lemma.workers.dev"
 FACILITATOR_URL = "https://x402-facilitator.lemma.workers.dev"
 PAY_TO_ADDRESS = "0x000000000000000000000000000000000000dEaD"  # Demo: burn address
-DEMO_MODE = "true"  # Set to false for real blockchain verification
+# DEMO_MODE is not set by default — real x402 payment flow is enabled.
+# To run locally without wallet setup, set DEMO_MODE=true in .dev.vars
 
 # Secrets (set via `npx wrangler secret put`):
 #   LEMMA_API_KEY   — Lemma API key (if required)

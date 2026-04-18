@@ -227,7 +227,7 @@ const mockQueryData = (): LemmaQueryResponse => ({
 // x402 route configuration
 // ---------------------------------------------------------------------------
 
-const buildRoutes = (payTo: string, apiKey?: string) => ({
+const buildRoutes = (payTo: string) => ({
   "GET /verify/:hash": {
     accepts: [
       {
@@ -247,7 +247,6 @@ const buildRoutes = (payTo: string, apiKey?: string) => ({
       lemma: {
         schema: "blog-article",
         verifiable: ["author", "published", "integrity", "words", "lang"],
-        ...(apiKey ? { apiKey } : {}),
       },
     },
   },
@@ -281,7 +280,6 @@ const buildRoutes = (payTo: string, apiKey?: string) => ({
           langs: ["en", "ja"],
           count: 3,
         },
-        ...(apiKey ? { apiKey } : {}),
       },
     },
   },
@@ -315,7 +313,7 @@ app.use("*", async (c, next) => {
     const resourceServer = new x402ResourceServer(facilitatorClient)
       .register("eip155:84532", new ExactEvmScheme());
 
-    const routes = buildRoutes(c.env.PAY_TO_ADDRESS, c.env.LEMMA_API_KEY);
+    const routes = buildRoutes(c.env.PAY_TO_ADDRESS);
     const middleware = paymentMiddleware(routes, resourceServer);
 
     return await middleware(c, next);

@@ -1,32 +1,30 @@
 # Demo Output Snippet
-# Date: 2026-04-14
+# Date: 2026-04-18
 # Network: Base Sepolia (eip155:84532)
+# Mode: --screenshot-mode (mock data, no real blockchain verification)
 
-$ WORKER_URL=http://127.0.0.1:8794 AGENT_PRIVATE_KEY=0x51... pnpm agent
+$ WORKER_URL=http://localhost:8787 pnpm agent --screenshot-mode
 
 Agent wallet: 0x60a556833A7C1fdC4Cb371583A694DDBD455C885
 
 === Phase 1: Fetch blog content (free) ===
   Fetching https://example-blog.com/articles/zk-proofs ...
-  Content fetched (2679 bytes)
+  Blog URL unreachable — using demo content for illustration
+  Content fetched (119 bytes)
 
 === Phase 2: Display as UNVERIFIED ===
-  Content preview: "<!DOCTYPE html>
-<html>
-    <head>
-        <meta charset="UTF-8">
-            <meta name="viewport" content="width=device..."
+  Content preview: "Artificial intelligence and blockchain technology are converging to create new possibilities for trust and automation."
   Status: UNVERIFIED
-  Attestation URL: (not discovered — using demo mode)
+  Attestation URL: (not discovered — using screenshot mode)
 
 === Phase 3: Pay $0.001 for provenance verification ===
-  Calling http://127.0.0.1:8794/verify/0xa1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4 with x402 auto-payment ...
+  Calling http://localhost:8787/verify/0xea79591c06bc62df2401f9fe2aa5e49a21dbc3e9176d613ec80b02c5bfdeebb1 with x402 auto-payment ...
   Payment accepted. Verified attributes received.
 
 === Phase 4: Confirm trust ===
-  Content SHA-256:  b21bcf0e0f5bb111acd9064ebad2babf3f584e3cfe11f0a7f8170b6d1733542a
-  Lemma integrity:  sha256-abc123
-  Integrity match:  NO (content may have been modified, or demo mode)
+  Content SHA-256:  ea79591c06bc62df2401f9fe2aa5e49a21dbc3e9176d613ec80b02c5bfdeebb1
+  Lemma integrity:  ea79591c06bc62df2401f9fe2aa5e49a21dbc3e9176d613ec80b02c5bfdeebb1
+  Integrity match:  YES
   Proof status:     verified
   Circuit ID:       blog-article-v1
 
@@ -34,13 +32,20 @@ Agent wallet: 0x60a556833A7C1fdC4Cb371583A694DDBD455C885
   title: Zero-Knowledge Proofs: A Gentle Introduction
   author: Alice
   published: 2024-03-15
-  integrity: sha256-abc123
+  integrity: ea79591c06bc62df2401f9fe2aa5e49a21dbc3e9176d613ec80b02c5bfdeebb1
   words: 1200
   lang: en
 
-  Status: PROOF VERIFIED (integrity mismatch)
+  Status: VERIFIED
+
+  ✓ Content is authentic — author, date, and integrity all confirmed.
 
 # Notes:
-# - DEMO_MODE=true in wrangler.toml skips real blockchain verification
-# - Integrity mismatch is expected in demo mode (mock data)
-# - x402 v2 format correctly used: network=eip155:84532, USDC on Base Sepolia
+# - --screenshot-mode skips real blockchain verification (for demos without wallet)
+# - For real x402 payments, run without --screenshot-mode and set:
+#   - AGENT_PRIVATE_KEY (wallet with Base Sepolia USDC)
+#   - DEMO_MODE=false in packages/worker/.dev.vars (or unset it)
+# - x402 v2 format: network=eip155:84532, USDC on Base Sepolia
+# - Faucets:
+#   - USDC: https://faucet.circle.com (select Base Sepolia)
+#   - ETH:  https://www.alchemy.com/faucets/base-sepolia
