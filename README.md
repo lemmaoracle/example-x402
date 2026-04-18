@@ -147,7 +147,7 @@ The script outputs a `docHash` — you can use this in manual curl tests.
 #### 2a. Unauthenticated access → 402 Payment Required
 
 ```bash
-curl -s http://localhost:8787/verify/<your-docHash> | jq
+curl -s http://localhost:8787/example/verify/<your-docHash> | jq
 ```
 
 Response:
@@ -165,7 +165,7 @@ Generate an x402 payment (see [x402 docs](https://docs.x402.org/)), then:
 
 ```bash
 curl -s -H "PAYMENT-SIGNATURE: <base64-encoded-payment-payload>" \
-  http://localhost:8787/verify/<your-docHash> | jq
+  http://localhost:8787/example/verify/<your-docHash> | jq
 ```
 
 Response:
@@ -223,8 +223,8 @@ Client Request
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/verify/:hash` | GET | Provenance verification (main) — verified attributes + proof status |
-| `/query` | POST | Full query with BBS+ selective disclosure (advanced) |
+| `/example/verify/:hash` | GET | Provenance verification (main) — verified attributes + proof status |
+| `/example/query` | POST | Full query with BBS+ selective disclosure (advanced) |
 | `/` | GET | Health check |
 
 ---
@@ -300,7 +300,7 @@ attestation is available; compatible agents pick it up automatically.
 ### A: HTTP Response Header (recommended)
 
 ```
-X-Lemma-Attestation: https://your-worker.workers.dev/verify/0xabc123
+X-Lemma-Attestation: https://your-worker.workers.dev/example/verify/0xabc123
 X-Lemma-Schema: blog-article-v1
 ```
 
@@ -313,7 +313,7 @@ export default {
     const newResponse = new Response(response.body, response);
     newResponse.headers.set(
       "X-Lemma-Attestation",
-      `https://your-worker.workers.dev/verify/${docHash}`
+      `https://your-worker.workers.dev/example/verify/${docHash}`
     );
     newResponse.headers.set("X-Lemma-Schema", "blog-article-v1");
     return newResponse;
@@ -326,7 +326,7 @@ export default {
 ```html
 <link
   rel="lemma-attestation"
-  href="https://your-worker.workers.dev/verify/0xabc123"
+  href="https://your-worker.workers.dev/example/verify/0xabc123"
   type="application/json+lemma"
 />
 ```
@@ -531,7 +531,7 @@ WORKER_URL=http://localhost:8787 node scripts/test-worker-endpoints.js
 
 ```
 packages/
-  worker/      Cloudflare Worker — Hono + x402, /verify + /query endpoints
+  worker/      Cloudflare Worker — Hono + x402, /example/verify + /example/query endpoints
   agent/       Node.js agent — 4-phase provenance verification demo
   circuit/     Circom circuit — blog-article-v1 (Poseidon commitment, pre-deployed)
   normalize/   Rust WASM — rowDoc → normDoc conversion (pre-deployed)

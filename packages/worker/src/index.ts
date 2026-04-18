@@ -228,7 +228,7 @@ const mockQueryData = (): LemmaQueryResponse => ({
 // ---------------------------------------------------------------------------
 
 const buildRoutes = (payTo: string) => ({
-  "GET /verify/:hash": {
+  "GET /example/verify/:hash": {
     accepts: [
       {
         scheme: "exact" as const,
@@ -250,7 +250,7 @@ const buildRoutes = (payTo: string) => ({
       },
     },
   },
-  "POST /query": {
+  "POST /example/query": {
     accepts: [
       {
         scheme: "exact" as const,
@@ -324,9 +324,9 @@ app.use("*", async (c, next) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /verify/:hash — Provenance verification endpoint
+// GET /example/verify/:hash — Provenance verification endpoint
 // ---------------------------------------------------------------------------
-app.get("/verify/:hash", async (c) => {
+app.get("/example/verify/:hash", async (c) => {
   const hash = c.req.param("hash");
   const apiBase = c.env.LEMMA_API_BASE.replace(/\/$/, "");
   const apiKey = c.env.LEMMA_API_KEY;
@@ -363,9 +363,9 @@ app.get("/verify/:hash", async (c) => {
 });
 
 // ---------------------------------------------------------------------------
-// POST /query — Full query with BBS+ selective disclosure
+// POST /example/query — Full query with BBS+ selective disclosure
 // ---------------------------------------------------------------------------
-app.post("/query", async (c) => {
+app.post("/example/query", async (c) => {
   const apiBase = c.env.LEMMA_API_BASE.replace(/\/$/, "");
   const apiKey = c.env.LEMMA_API_KEY;
   const demoMode = c.env.DEMO_MODE === "true";
@@ -422,8 +422,8 @@ app.get("/", (c) =>
     service: "lemma-x402-worker",
     tagline: "Content is free. Trust costs $0.001.",
     endpoints: {
-      verify: "GET /verify/:hash (provenance verification — main)",
-      query: "POST /query (BBS+ selective disclosure — advanced)",
+      verify: "GET /example/verify/:hash (provenance verification — main)",
+      query: "POST /example/query (BBS+ selective disclosure — advanced)",
       health: "GET /",
     },
   }),

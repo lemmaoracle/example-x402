@@ -366,11 +366,11 @@ const advancedDisclosure = async (): Promise<void> => {
   await sleep(150);
   
   const spinner = ora({
-    text: chalk.gray(`Querying ${WORKER_URL}/query with x402 auto-payment ...`),
+    text: chalk.gray(`Querying ${WORKER_URL}/example/query with x402 auto-payment ...`),
     spinner: spinners.dots,
   }).start();
 
-  const response = await x402Fetch(`${WORKER_URL}/query`, {
+  const response = await x402Fetch(`${WORKER_URL}/example/query`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -464,7 +464,7 @@ const main = async (): Promise<void> => {
   // Use discovered attestation URL, or fall back to demo URL
   const verifyUrl =
     attestationUrl ||
-    `${WORKER_URL}/verify/0xea79591c06bc62df2401f9fe2aa5e49a21dbc3e9176d613ec80b02c5bfdeebb1`;
+    `${WORKER_URL}/example/verify/0xea79591c06bc62df2401f9fe2aa5e49a21dbc3e9176d613ec80b02c5bfdeebb1`;
 
   const verifyResult = await phase3_verify(verifyUrl);
 
