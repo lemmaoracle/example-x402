@@ -460,20 +460,6 @@ const advancedDisclosure = async (
     console.log();
     await sleep(70);
     
-    console.log(`    ${chalk.gray("attributes:")}`);
-    await sleep(50);
-    for (const [k, v] of Object.entries(item.attributes)) {
-      process.stdout.write(`      ${chalk.gray(k)}: `);
-      const vStr = String(v);
-      if (vStr.length > 40) {
-        await typewrite(vStr, chalk.white, 2, 10);
-      } else {
-        await typewrite(vStr, chalk.white, 7, 20);
-      }
-      console.log();
-      await sleep(30);
-    }
-    
     // Display full BBS+ disclosure envelope
     if (item.disclosure) {
       const sd = item.disclosure;
