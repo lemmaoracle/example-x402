@@ -113,27 +113,10 @@ const docHash = `0x${normalized.integrity as string}`;
     },
   });
 
-  // Submit proof with selective disclosure for free tier
-  await proofs.submit(client, {
-    docHash,
-    circuitId: "blog-article-v1",
-    proof: "", // Placeholder for production
-    inputs: [
-      normalized.author as string,
-      String(normalized.published),
-      normalized.integrity as string,
-      String(normalized.words),
-      normalized.lang as string,
-    ],
-    disclosure: disclose.toSelectiveDisclosure(freeDisclosure, {
-      publicKey: signed.publicKey,
-      header: new TextEncoder().encode("blog-article-v1"),
-      count: messages.length,
-    }),
-  });
-
   // Submit proof with selective disclosure for paid tier
   // condition: x402-payment-v1 requires on-chain payment proof to disclose
+  // Without proof: only basic attributes are visible
+  // With proof: body and fullContent are disclosed
   await proofs.submit(client, {
     docHash,
     circuitId: "blog-article-v1",
@@ -171,7 +154,7 @@ const docHash = `0x${normalized.integrity as string}`;
 const exampleArticle = {
   title: "The Future of AI and Blockchain",
   author: "did:example:alice",
-  body: "Artificial intelligence and blockchain technology are converging to create new possibilities for trust and automation.",
+  body: "Artificial intelligence and blockchain technology are converging to create new possibilities for trust and automation. This convergence enables verifiable provenance and transparent content attribution.",
   publishedAt: "2026-04-08T14:30:00Z",
   lang: "en",
   fullContent: `

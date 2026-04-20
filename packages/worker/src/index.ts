@@ -65,7 +65,7 @@ type LemmaQueryResponse = Readonly<{
   hasMore: boolean;
 }>;
 
-/** Simplified response item (no BBS+ crypto data). */
+/** Simplified response item (includes full BBS+ disclosure envelope). */
 type QueryResponseItem = Readonly<{
   docHash: string;
   schema: string;
@@ -74,6 +74,17 @@ type QueryResponseItem = Readonly<{
   chainId?: number;
   attributes: Readonly<Record<string, unknown>>;
   disclosed: Readonly<Record<string, unknown>> | null;
+  /** Full BBS+ disclosure envelope (format, proof, publicKey, indexes, etc.) */
+  disclosure?: Readonly<{
+    format: string;
+    attributes: Readonly<Record<string, unknown>>;
+    proof: string;
+    publicKey: string;
+    indexes: ReadonlyArray<number>;
+    count: number;
+    header: string;
+    condition?: Readonly<{ circuitId: string }>;
+  }> | null;
   disclosureError?: "condition_not_met";
   proof?: Readonly<Record<string, unknown>>;
 }>;
@@ -115,6 +126,8 @@ const simplifyItem = (item: LemmaResponseItem): QueryResponseItem => ({
   ...(item.chainId !== undefined ? { chainId: item.chainId } : {}),
   attributes: item.attributes,
   disclosed: extractDisclosed(item.disclosure),
+  // Include full disclosure envelope for BBS+ verification
+  disclosure: item.disclosure,
   ...(item.disclosureError ? { disclosureError: item.disclosureError } : {}),
   ...(item.proof ? { proof: item.proof } : {}),
 });
@@ -140,13 +153,18 @@ const lemmaHeaders = (apiKey?: string): Record<string, string> => ({
 /**
  * Extract settlement result from the PAYMENT-RESPONSE header.
  * The middleware sets this header as Base64-encoded JSON after settle.
+ * Returns the full extensions.lemma object (x402 spec compliant).
  */
 const extractSettlement = (
   headerValue: string | undefined,
-): { txHash: string; proof: string; inputs?: unknown[] } | null => {
+): { transaction: string; lemma?: { proof: string; inputs: unknown[] } } | null => {
   if (!headerValue) return null;
   try {
-    return JSON.parse(atob(headerValue));
+    const parsed = JSON.parse(atob(headerValue));
+    return {
+      transaction: parsed.transaction,
+      lemma: parsed?.extensions?.lemma,
+    };
   } catch {
     return null;
   }
@@ -158,9 +176,9 @@ const extractSettlement = (
 
 // Since the content of the blog changes every time we fetch it (probably due to dynamic tracking scripts or timestamps),
 // we use a fixed demo content for the local agent demo so the hashes match.
-const DEMO_CONTENT = `Artificial intelligence and blockchain technology are converging to create new possibilities for trust and automation.`;
+const DEMO_CONTENT = `Artificial intelligence and blockchain technology are converging to create new possibilities for trust and automation. This convergence enables verifiable provenance and transparent content attribution.`;
 // Pre-computed SHA-256 of DEMO_CONTENT
-const DEMO_CONTENT_HASH = "ea79591c06bc62df2401f9fe2aa5e49a21dbc3e9176d613ec80b02c5bfdeebb1";
+const DEMO_CONTENT_HASH = "c6b3380e0d8334e87c3e55d23e987dc0b7638e91950a2467b2bb496e62ac6fdd";
 
 const mockVerifyData = (hash: string): LemmaQueryResponse => ({
   results: [
@@ -170,12 +188,13 @@ const mockVerifyData = (hash: string): LemmaQueryResponse => ({
       issuerId: "did:example:lemma",
       subjectId: "did:example:blog-author",
       attributes: {
-        title: "Zero-Knowledge Proofs: A Gentle Introduction",
-        author: "Alice",
-        published: "2024-03-15",
+        title: "The Future of AI and Blockchain",
+        author: "did:example:alice",
+        published: 1775658600,
         integrity: DEMO_CONTENT_HASH,
-        words: 1200,
+        words: 24,
         lang: "en",
+        content_type: "html",
       },
       proof: { circuitId: "blog-article-v1" },
     },
@@ -186,26 +205,34 @@ const mockVerifyData = (hash: string): LemmaQueryResponse => ({
 const mockQueryData = (): LemmaQueryResponse => ({
   results: [
     {
-      docHash: "0xa1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4",
+      docHash: `0x${DEMO_CONTENT_HASH}`,
       schema: "blog-article",
       issuerId: "did:example:lemma",
       subjectId: "did:example:blog-author",
       attributes: {
-        title: "Zero-Knowledge Proofs: A Gentle Introduction",
-        author: "Alice",
-        published: "2024-03-15",
+        title: "The Future of AI and Blockchain",
+        author: "did:example:alice",
+        published: 1775658600,
         integrity: DEMO_CONTENT_HASH,
-        words: 1200,
+        words: 24,
         lang: "en",
+        content_type: "html",
       },
       disclosure: {
         format: "BBS+",
-        attributes: { author: "Alice", published: "2024-03-15" },
+        attributes: { 
+          author: "did:example:alice", 
+          lang: "en", 
+          published: 1775658600,
+          body: "Artificial intelligence and blockchain technology are converging to create new possibilities for trust and automation. This convergence enables verifiable provenance and transparent content attribution.",
+          fullContent: "<html>...</html>",
+        },
         proof: "mock-bbs-proof",
         publicKey: "mock-public-key",
-        indexes: [1, 2],
-        count: 6,
-        header: "mock-header",
+        indexes: [0, 3, 4, 1, 7],
+        count: 8,
+        header: "blog-article-v1",
+        condition: { circuitId: "x402-payment-v1" },
       },
     },
   ],
@@ -283,14 +310,20 @@ const app = new Hono<{ Bindings: Env }>();
 /**
  * Apply x402 payment middleware conditionally.
  *
- * In demo mode, middleware is skipped entirely — handlers return mock data.
- * In production mode, @x402/hono handles the full 402/verify/settle flow.
+ * - Demo mode: skip entirely
+ * - Request with "disclosure" in body: skip (pre-paid proof provided)
+ * - Otherwise: standard x402 payment flow
  */
 app.use("*", async (c, next) => {
   const demoMode = c.env.DEMO_MODE === "true";
 
-  // Skip x402 middleware for health check and in demo mode
   if (c.req.path === "/" || demoMode) {
+    return next();
+  }
+
+  // Skip x402 for health check, demo mode, and /query endpoint
+  // /query uses disclosure proof from client (already paid via /verify)
+  if (c.req.path === "/" || demoMode || c.req.path === "/example/query") {
     return next();
   }
 
@@ -374,37 +407,23 @@ app.post("/example/query", async (c) => {
   if (demoMode) {
     data = mockQueryData();
   } else {
-    // Extract settlement proof from PAYMENT-RESPONSE header (set by middleware)
-    const settlement = extractSettlement(c.res.headers.get("PAYMENT-RESPONSE") ?? undefined);
-
-    const callerBody = await c.req
-      .json<Record<string, unknown>>()
-      .catch(() => ({}));
-
-    // Merge the caller's query params with the settlement proof disclosure.
-    const body = {
-      attributes:[],
-      ...callerBody,
-      ...(settlement ? {
-        disclosure: {
-          proof: settlement.proof,
-          inputs: settlement.inputs ?? [],
-        },
-      } : {}),
-    };
+    const callerBody = await c.req.json<Record<string, unknown>>().catch(() => ({}));
+    console.log("[DEBUG] /query received body:", JSON.stringify(callerBody, null, 2));
 
     const response = await fetch(`${apiBase}/v1/verified-attributes/query`, {
       method: "POST",
       headers: lemmaHeaders(apiKey),
-      body: JSON.stringify(body),
+      body: JSON.stringify(callerBody),
     });
 
     if (!response.ok) {
       const error = await response.text();
+      console.log("[DEBUG] Lemma API error response:", error);
       return c.json({ error }, response.status as 500);
     }
 
     data = (await response.json()) as LemmaQueryResponse;
+    
   }
 
   return c.json({

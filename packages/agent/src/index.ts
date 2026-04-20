@@ -1,12 +1,12 @@
 /**
- * Lemma × x402 agent demo — 4-phase provenance verification.
+ * Lemma x x402 agent demo - 4-phase provenance verification.
  *
  * Demonstrates the "Content is free. Trust costs $0.001." flow:
  *
- *   Phase 1: Fetch blog article freely → content acquired
+ *   Phase 1: Fetch blog article freely -> content acquired
  *   Phase 2: Discover attestation URL (X-Lemma-Attestation header / <link> tag)
- *   Phase 3: Pay $0.001 via x402 → receive verified attributes + proof
- *   Phase 4: Compare content hash with integrity attribute → trust confirmed
+ *   Phase 3: Pay $0.001 via x402 -> receive verified attributes + proof
+ *   Phase 4: Compare content hash with integrity attribute -> trust confirmed
  *
  * Usage:
  *   AGENT_PRIVATE_KEY=0x... WORKER_URL=https://... BLOG_URL=https://... tsx src/index.ts
@@ -86,6 +86,38 @@ const sha256 = (content: string): string => {
 };
 
 // ---------------------------------------------------------------------------
+// Utility: extract settlement proof from PAYMENT-RESPONSE header
+// ---------------------------------------------------------------------------
+type PaymentResponseExtension = {
+  transaction: string;
+  network: string;
+  payer?: string;
+  extensions?: {
+    lemma?: {
+      proof: string;
+      inputs: string[];
+      circuitId: string;
+      generatedAt: number;
+    };
+  };
+};
+
+/**
+ * Extract settlement proof from PAYMENT-RESPONSE header.
+ * The header is Base64-encoded JSON set by the x402 middleware after settlement.
+ */
+const extractPaymentResponse = (
+  headerValue: string | null,
+): PaymentResponseExtension | null => {
+  if (!headerValue) return null;
+  try {
+    return JSON.parse(atob(headerValue)) as PaymentResponseExtension;
+  } catch {
+    return null;
+  }
+};
+
+// ---------------------------------------------------------------------------
 // Utility: sleep and typewrite for CLI effects
 // ---------------------------------------------------------------------------
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -106,7 +138,7 @@ const typewrite = async (
 // Phase 1: Fetch blog content freely
 // ---------------------------------------------------------------------------
 // Demo content (must match worker's DEMO_CONTENT)
-const DEMO_CONTENT = `Artificial intelligence and blockchain technology are converging to create new possibilities for trust and automation.`;
+const DEMO_CONTENT = `Artificial intelligence and blockchain technology are converging to create new possibilities for trust and automation. This convergence enables verifiable provenance and transparent content attribution.`;
 
 const phase1_fetchContent = async (): Promise<{
   content: string;
@@ -154,13 +186,13 @@ const phase1_fetchContent = async (): Promise<{
     // If we didn't discover an attestation URL, use fixed demo content for hash matching.
     // The fallback verification URL uses the demo content hash, so the content must match.
     if (!attestationUrl) {
-      console.log(chalk.gray("  (No attestation URL found — using demo content for verification)"));
+      console.log(chalk.gray("  (No attestation URL found - using demo content for verification)"));
       content = DEMO_CONTENT;
     }
   } catch {
     // If the blog URL is unreachable (e.g. standalone screenshot mode), use placeholder content
     spinner.warn(
-      chalk.yellow("Blog URL unreachable — using demo content for illustration"),
+      chalk.yellow("Blog URL unreachable - using demo content for illustration"),
     );
     content = DEMO_CONTENT;
     attestationUrl = null;
@@ -183,7 +215,7 @@ const phase2_displayUnverified = (
   );
   console.log(`  Status: ${chalk.bgRed.white.bold(" UNVERIFIED ")}`);
   console.log(
-    chalk.gray(`  Attestation URL: ${attestationUrl || "(not discovered — using demo mode)"}`),
+    chalk.gray(`  Attestation URL: ${attestationUrl || "(not discovered - using demo mode)"}`),
   );
   if (schema) {
     console.log(chalk.gray(`  Schema: ${schema}`));
@@ -199,6 +231,8 @@ const phase3_verify = async (
   attributes: Record<string, unknown>;
   proof: { status: string; circuitId?: string };
   docHash: string;
+  /** Settlement proof from PAYMENT-RESPONSE header (for disclosure queries) */
+  settlementProof?: { proof: string; inputs: string[]; circuitId: string };
 } | null> => {
   console.log(chalk.bold.yellow("\n=== Phase 3: Pay $0.001 for provenance verification ==="));
   
@@ -252,10 +286,15 @@ const phase3_verify = async (
     const result = data.results[0];
     spinner.succeed(chalk.green("Payment accepted. Verified attributes received."));
 
+    // Extract settlement proof from PAYMENT-RESPONSE header for disclosure queries
+    const paymentResponse = extractPaymentResponse(response.headers.get("PAYMENT-RESPONSE"));
+    const settlementProof = paymentResponse?.extensions?.lemma;
+
     return {
       attributes: result.attributes,
       proof: result.proof,
       docHash: result.docHash,
+      ...(settlementProof ? { settlementProof } : {}),
     };
   } catch (err) {
     spinner.fail(chalk.red("Error during verification"));
@@ -340,7 +379,7 @@ const phase4_confirmTrust = async (
   if (isFullyVerified) {
     await sleep(100);
     console.log(
-      chalk.green("  ✓ Content is authentic — author, date, and integrity all confirmed."),
+      chalk.green("  Content is authentic - author, date, and integrity all confirmed."),
     );
   }
 };
@@ -348,7 +387,10 @@ const phase4_confirmTrust = async (
 // ---------------------------------------------------------------------------
 // Advanced: BBS+ selective disclosure via /query
 // ---------------------------------------------------------------------------
-const advancedDisclosure = async (docHash: string): Promise<void> => {
+const advancedDisclosure = async (
+  docHash: string,
+  settlementProof?: { proof: string; inputs: string[]; circuitId: string },
+): Promise<void> => {
   console.log(chalk.bold.blue("\n=== Advanced: BBS+ Selective Disclosure (/query) ==="));
   await sleep(150);
   
@@ -361,7 +403,14 @@ const advancedDisclosure = async (docHash: string): Promise<void> => {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      docHash: docHash,
+      docHash,
+      attributes: [],
+      ...(settlementProof ? {
+        disclosure: {
+          proof: settlementProof.proof,
+          inputs: settlementProof.inputs,
+        },
+      } : {}),
     }),
   });
 
@@ -378,6 +427,17 @@ const advancedDisclosure = async (docHash: string): Promise<void> => {
       schema: string;
       attributes: Record<string, unknown>;
       disclosed: Record<string, unknown> | null;
+      /** Full BBS+ disclosure envelope */
+      disclosure?: {
+        format: string;
+        attributes: Record<string, unknown>;
+        proof: string;
+        publicKey: string;
+        indexes: number[];
+        count: number;
+        header: string;
+        condition?: { circuitId: string };
+      } | null;
       proof?: Record<string, unknown>;
     }>;
     hasMore: boolean;
@@ -414,7 +474,40 @@ const advancedDisclosure = async (docHash: string): Promise<void> => {
       await sleep(30);
     }
     
-    if (item.disclosed) {
+    // Display full BBS+ disclosure envelope
+    if (item.disclosure) {
+      const sd = item.disclosure;
+      await sleep(70);
+      console.log(`    ${chalk.gray("disclosure envelope:")}`);
+      await sleep(50);
+      console.log(`      ${chalk.gray("format:")}     ${chalk.white(sd.format)}`);
+      console.log(`      ${chalk.gray("proof:")}      ${chalk.cyan(sd.proof.slice(0, 20) + "..." + sd.proof.slice(-10))}`);
+      console.log(`      ${chalk.gray("publicKey:")}  ${chalk.cyan(sd.publicKey.slice(0, 20) + "...")}`);
+      console.log(`      ${chalk.gray("indexes:")}    ${chalk.white(JSON.stringify(sd.indexes))}`);
+      console.log(`      ${chalk.gray("count:")}      ${chalk.white(String(sd.count))}`);
+      if (sd.condition) {
+        console.log(`      ${chalk.gray("condition:")}  ${chalk.yellow(sd.condition.circuitId)}`);
+      }
+      
+      // Disclosed attributes (the actual revealed values)
+      await sleep(50);
+      console.log(`    ${chalk.gray("disclosed attributes:")}`);
+      await sleep(50);
+      if (sd.attributes && Object.keys(sd.attributes).length > 0) {
+        for (const [k, v] of Object.entries(sd.attributes)) {
+          process.stdout.write(`      ${chalk.gray(k)}: `);
+          const vStr = String(v);
+          if (vStr.length > 40) {
+            await typewrite(vStr, chalk.green, 2, 10);
+          } else {
+            await typewrite(vStr, chalk.green, 7, 20);
+          }
+          console.log();
+          await sleep(30);
+        }
+      }
+    } else if (item.disclosed) {
+      // Fallback: simplified disclosed (without BBS+ envelope)
       await sleep(70);
       console.log(`    ${chalk.gray("disclosed:")}`);
       await sleep(50);
@@ -451,7 +544,7 @@ const main = async (): Promise<void> => {
   // Use discovered attestation URL, or fall back to demo URL
   const verifyUrl =
     attestationUrl ||
-    `${WORKER_URL}/example/verify/0xea79591c06bc62df2401f9fe2aa5e49a21dbc3e9176d613ec80b02c5bfdeebb1`;
+    `${WORKER_URL}/example/verify/0xc6b3380e0d8334e87c3e55d23e987dc0b7638e91950a2467b2bb496e62ac6fdd`;
 
   const verifyResult = await phase3_verify(verifyUrl);
 
@@ -468,7 +561,8 @@ const main = async (): Promise<void> => {
   // Advanced: BBS+ selective disclosure (optional)
   if (WITH_DISCLOSURE) {
     await advancedDisclosure(
-      verifyResult ? verifyResult.docHash : "0xea79591c06bc62df2401f9fe2aa5e49a21dbc3e9176d613ec80b02c5bfdeebb1"
+      verifyResult ? verifyResult.docHash : "0xc6b3380e0d8334e87c3e55d23e987dc0b7638e91950a2467b2bb496e62ac6fdd",
+      verifyResult?.settlementProof,
     );
   }
 };
