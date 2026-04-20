@@ -348,7 +348,7 @@ const phase4_confirmTrust = async (
 // ---------------------------------------------------------------------------
 // Advanced: BBS+ selective disclosure via /query
 // ---------------------------------------------------------------------------
-const advancedDisclosure = async (): Promise<void> => {
+const advancedDisclosure = async (docHash: string): Promise<void> => {
   console.log(chalk.bold.blue("\n=== Advanced: BBS+ Selective Disclosure (/query) ==="));
   await sleep(150);
   
@@ -361,7 +361,7 @@ const advancedDisclosure = async (): Promise<void> => {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      targets: { schemas: ["blog-article"] },
+      docHash: docHash,
     }),
   });
 
@@ -467,7 +467,9 @@ const main = async (): Promise<void> => {
 
   // Advanced: BBS+ selective disclosure (optional)
   if (WITH_DISCLOSURE) {
-    await advancedDisclosure();
+    await advancedDisclosure(
+      verifyResult ? verifyResult.docHash : "0xea79591c06bc62df2401f9fe2aa5e49a21dbc3e9176d613ec80b02c5bfdeebb1"
+    );
   }
 };
 
