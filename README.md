@@ -68,26 +68,34 @@ Experience the 4-phase provenance verification demo where an agent pays and veri
 - Node.js 20+, pnpm 9+
 - Base Sepolia wallet with test USDC ([Circle Faucet](https://faucet.circle.com/))
 
-### 1. Start the Resource Worker
 ```bash
-# Clone and install
 git clone https://github.com/lemmaoracle/example-x402
 cd example-x402
 pnpm install
-
-# Start the worker
-pnpm dev:worker
 ```
-The worker runs at `http://localhost:8787`.
 
-### 2. Run the Agent
-In another terminal, run the agent script to see the standard flow (fetch → unverified → pay → verified):
+### 1. Configure
+
 ```bash
+cp .env.example .env
+# Required: PAY_TO_ADDRESS, AGENT_PRIVATE_KEY
+```
+
+### 2. Start the worker
+
+```bash
+pnpm dev:worker   # → http://localhost:8787
+```
+
+> Set `DEMO_MODE=true` in `packages/worker/.dev.vars` to skip real payment verification during local development.
+
+### 3. Run the agent
+
+```bash
+# Standard flow: fetch → discover attestation → pay → verify
 pnpm agent
-```
 
-For the advanced **BBS+ selective disclosure** flow (additionally queries for disclosed title/body):
-```bash
+# Advanced flow: also queries POST /query for BBS+ selective disclosure
 pnpm agent:disclosure
 ```
 
