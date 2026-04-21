@@ -1,285 +1,377 @@
-# Lemma ZK attributes × x402 micropayments on Base Sepolia
+# Lemma × x402 — ZK-verified agent payments on Base Sepolia
 
-**Agentic payments run on x402. Agentic trust runs on Lemma.**
+> **Agentic payments run on x402. Agentic trust runs on Lemma.**
 
-Lemma is a trust layer that attaches ZK-proven attributes — org IDs, roles, permission scopes, compliance flags — to AI agents before they pay with x402. You can drop it into your existing HTTP 402 payment flows so every agent-to-API or agent-to-agent payment cryptographically proves *who is paying* and *under what policy*.
+x402 lets agents pay. Lemma proves *who* paid and *under what authority* — cryptographically, on-chain, without exposing the underlying data.
+
+This repo is a reference implementation: an HTTP 402 flow where every micropayment carries a ZK proof of data authenticity, a BBS+ selective disclosure, and a settlement proof — all verifiable by any agent or smart contract.
 
 <div align="center">
   
 ![Terminal demo showing the agent fetching content, making a micropayment via x402, and receiving verified attributes](assets/terminal.gif)
 
-*Demo: Agent fetches content → discovers attestation → pays $0.001 via x402 → receives ZK-verified attributes → selectively discloses specific fields*
-</div>
+*Demo: Agent fetches content → discovers attestation → pays $0.001 via x402 → receives ZK-verified attributes → selectively discloses specific fields*</div>
 
 ---
 
-## Quick Start: Demo Steps (5 minutes)
+## The problem this solves
 
-Experience the 4-phase provenance verification demo where an agent pays and verifies data.
+Agents can already move money. What they can't do is prove anything about themselves or the data they receive:
 
-### 1. Start the Resource Worker
-```bash
-# Clone and install
-git clone https://github.com/lemmaoracle/example-x402
-cd example-x402
-pnpm install
+| Without Lemma | With Lemma |
+| :--- | :--- |
+| Anonymous transfer | ZK-proven agent ID (issuer + role + policy) |
+| "Trust me" self-report | On-chain verifiable attributes |
+| No provenance on received data | Cryptographic integrity binding per response |
 
-# Start the worker
-pnpm dev:worker
-```
-The worker runs at `http://localhost:8787`.
-
-### 2. Run the Agent
-In another terminal, run the agent script to see the standard flow (fetch → unverified → pay → verified):
-```bash
-pnpm agent
-```
-
-For the advanced **BBS+ selective disclosure** flow (additionally queries for disclosed title/body):
-```bash
-pnpm agent:disclosure
-```
+One middleware call turns every x402 payment into a verifiable trust event.
 
 ---
 
-## Why agents need more than a wallet
+## What happens in this demo
 
-Agents can pay — but recipients can't tell who paid or under what authority. Lemma fills this gap:
-
-| Feature | Without Lemma | With Lemma |
-| :--- | :--- | :--- |
-| **Identity** | Anonymous transfer | ZK-proven agent ID (issuer + role + policy) |
-| **Authority** | "Trust me" self-report | On-chain verifiable attributes |
-| **Authenticity** | No provenance on data received | Cryptographic integrity binding per response |
-
-Drop in a few lines of middleware, and every x402 payment carries machine-verifiable proof of identity, authorization, and data authenticity.
-
-## What This Demo Proves
-
-A reference implementation of ZK-verified agent transactions — an x402 payment flow where every request carries cryptographic proof of data authenticity and payment settlement.
-
-```text
-Agent ──[fetches data freely]──▶ Content Source
-  │                                     │
-  │  "I have the data, but can I        │ X-Lemma-Attestation header
-  │   trust it? And can anyone          │ signals: verification available
-  │   trust that I verified it?"        │
-  │                                     │
-  ▼                                     │
-  [$0.001 USDC via x402]               │
-  │                                     │
-  ▼                                     │
-  Lemma Worker ◀────────────────────────┘
-  │
-  ├─ Attribute proof: author, date, integrity verified (Poseidon commitment)
-  ├─ Payment proof: on-chain settlement confirmed (x402 facilitator)
-  └─ Minimal disclosure: only requested fields revealed (BBS+ signatures)
-      │
-      ▼
-  Verified Result
-  "Author, date, integrity — all proven. Payment settled."
+```
+Agent ──[GET /article]──────────────────▶ Content Source
+                                               │
+                               X-Lemma-Attestation header
+                                               │
+        [$0.001 USDC via x402]                │
+              │                               │
+              ▼                               │
+        Lemma Worker ◀─────────────────────────┘
+              │
+              ├─ Attribute proof   author, date, integrity (Poseidon commitment)
+              ├─ Payment proof     settlement confirmed on Base Sepolia
+              └─ Minimal disclosure  only the fields the agent requested (BBS+)
+              │
+              ▼
+        Agent receives: { author, published, integrity } — nothing more
 ```
 
 ### What each layer proves
 
-| Layer | What's proven | How (in this demo) |
+| Layer | Claim | Mechanism |
 | :--- | :--- | :--- |
-| **Attribute Authenticity** | Author, date, and content integrity haven't been tampered with | `blog-article-v1` Poseidon commitment circuit + SHA-256 integrity binding |
-| **Payment Settlement** | Payment occurred on-chain for the stated amount | x402 facilitator verify → settle on Base Sepolia |
-| **Minimal Exposure** | The verifier sees only the attributes it needs — nothing more | BBS+ signatures over normalized attributes |
+| **Attribute authenticity** | Author, date, body haven't been tampered with | Poseidon Merkle commitment + SHA-256 integrity |
+| **Payment settlement** | Payment occurred for the stated amount | x402 facilitator → settle on Base Sepolia |
+| **Minimal disclosure** | Verifier sees only the requested fields | BBS+ signature over normalized attributes |
 
 A blog article is the entry-point example. The architecture generalizes to any verifiable data: credentials, sensor readings, financial attestations, research outputs, on-chain events.
 
 ---
 
-## Why This Matters
+## Quickstart (5 min)
 
-Every x402 payment in this demo carries machine-verifiable proof — not
-just that money moved, but that specific attributes are authentic:
+### Prerequisites
+- Node.js 20+, pnpm 9+
+- Base Sepolia wallet with test USDC ([Circle Faucet](https://faucet.circle.com/)) and ETH for gas ([Base Faucet](https://www.alchemy.com/faucets/base-sepolia))
+- Cloudflare account (free tier)
 
-- **Verified provenance** — author, publication date, and content integrity are bound to a Poseidon commitment. Any tampering breaks the proof.
-- **Pay-to-verify** — content is freely accessible; $0.001 USDC unlocks the ZK-verified attribute set that proves the content is real.
-- **Need-to-know disclosure** — the verifier receives only the fields it requests. Full credentials stay private.
+```bash
+git clone https://github.com/lemmaoracle/example-x402
+cd example-x402
+pnpm install
+```
 
-Cryptographic proof of data (Lemma) + native payment (x402) = **agents that can pay, verify, and act on trusted data**.
-
----
-
-
-## How It Works
-
-### Agent Experience (4 phases)
-
-| Phase | Action | What's Proven |
-| :--- | :--- | :--- |
-| 1 | Agent fetches content normally | Data acquired (free, unverified) |
-| 2 | Agent discovers `X-Lemma-Attestation` header | Attestation available |
-| 3 | Agent pays $0.001 via x402 → receives verified attributes | Payment on-chain + data authenticity (ZK) |
-| 4 | Agent compares content hash with integrity attribute | End-to-end integrity confirmed |
-
-### Endpoints
-
-| Endpoint | Method | Purpose |
-| :--- | :--- | :--- |
-| `/example/verify/:hash` | GET | Provenance verification (main) — verified attributes + proof status |
-| `/example/query` | POST | Full query with BBS+ selective disclosure (advanced) |
-| `/` | GET | Health check |
-
----
-
-## Prerequisites & Deployment
-
-- Node.js 20+
-- pnpm 9+
-- Wrangler CLI (installed as a project dependency)
-- Base Sepolia wallet with test USDC ([faucet](https://faucet.circle.com/)) and ETH for gas
-- Cloudflare account (free tier works)
-
-### Deploy the worker
+### 1. Configure
 
 ```bash
 cp .env.example .env
-# Edit .env: set PAY_TO_ADDRESS and AGENT_PRIVATE_KEY
-
-npx wrangler secret put PAY_TO_ADDRESS --cwd packages/worker
-npx wrangler secret put LEMMA_API_BASE --cwd packages/worker
-
-pnpm deploy:worker
-# → https://lemma-query.YOUR-SUBDOMAIN.workers.dev
+# Required: PAY_TO_ADDRESS, AGENT_PRIVATE_KEY
 ```
-Update `WORKER_URL` in `.env` with the deployed URL.
+
+### 2. Start the worker
+
+```bash
+pnpm dev:worker   # → http://localhost:8787
+```
+
+> Set `DEMO_MODE=true` in `packages/worker/.dev.vars` to skip real payment verification during local development.
+
+### 3. Run the agent
+
+```bash
+# Standard flow: fetch → discover attestation → pay → verify
+pnpm agent
+
+# Advanced flow: also queries POST /query for BBS+ selective disclosure
+pnpm agent:disclosure
+```
 
 ---
 
-## Discovery: Integrate with Your Content Source
+## How to integrate with your own content
 
-There are three ways to integrate Lemma with your content source, ranging from the most direct to standard discovery models.
+There are three integration approaches, from most direct to most standard:
 
-### 1. Direct Middleware (The Primitive Way)
-The most direct integration is to apply the x402 payment middleware directly to your resource endpoint. This is exactly what `packages/worker/src/index.ts` does.
+### Option A — Direct middleware (recommended starting point)
+
+Apply the x402 payment middleware to your resource endpoint:
 
 ```typescript
 import { paymentMiddleware } from "@x402/hono";
 import { HTTPFacilitatorClient, x402ResourceServer } from "@x402/core/server";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
 
-// 1. Setup x402 facilitator and resource server
-const facilitatorClient = new HTTPFacilitatorClient({ url: "https://x402-facilitator.lemma.workers.dev" });
-const resourceServer = new x402ResourceServer(facilitatorClient)
+const facilitator = new HTTPFacilitatorClient({
+  url: "https://x402-facilitator.lemma.workers.dev",
+});
+const resourceServer = new x402ResourceServer(facilitator)
   .register("eip155:84532", new ExactEvmScheme());
 
-// 2. Define route requirements
 const routes = {
-  "GET /example/verify/:hash": {
+  "GET /verify/:hash": {
     accepts: [{ scheme: "exact", price: "$0.001", network: "eip155:84532", payTo }],
-    extensions: { lemma: { schema: "blog-article" } }
-  }
+    extensions: { lemma: { schema: "blog-article-v1" } },
+  },
 };
 
-// 3. Apply middleware
 app.use("*", paymentMiddleware(routes, resourceServer));
 ```
 
-### 2. AI User-Agent Redirection
-Another primitive approach is to serve free content to humans but redirect AI agents to your Lemma x402 worker. We provide helper scripts in the `scripts/` directory for this:
+### Option B — Discovery headers (pull-based, agent-compatible)
 
-- `scripts/ai-redirect.js`: Client-side JavaScript detection.
-- `scripts/wordpress-ai-redirect.php`: WordPress plugin for server-side detection.
+Add these headers to any content response; compliant agents discover attestation automatically:
 
-```javascript
-// Simple User-Agent detection pattern
-const aiPatterns = ['OpenAI', 'Claude', 'GPT', 'Bot', 'Crawler'];
-const isAIAgent = aiPatterns.some(p => navigator.userAgent.includes(p));
-
-if (isAIAgent) {
-  // Redirect AI to the paid verification gateway
-  window.location.href = `https://your-worker.workers.dev/ai-content/${slug}`;
-}
-```
-
-### 3. Pull-Based Discovery
-Lemma uses a pull-based discovery model. Your content source signals that attestation is available; compatible agents pick it up automatically.
-
-**HTTP Response Header**
 ```http
 X-Lemma-Attestation: https://your-worker.workers.dev/example/verify/0xabc123
 X-Lemma-Schema: blog-article-v1
 ```
 
-**HTML `<link>` meta tag**
+Or as an HTML meta tag:
+
 ```html
-<link
-  rel="lemma-attestation"
-  href="https://your-worker.workers.dev/example/verify/0xabc123"
-  type="application/json+lemma"
-/>
+<link rel="lemma-attestation"
+      href="https://your-worker.workers.dev/example/verify/0xabc123"
+      type="application/json+lemma" />
+```
+
+### Option C — AI user-agent redirection
+
+Serve humans normally; redirect AI agents to the x402 gateway:
+
+```javascript
+// scripts/ai-redirect.js — drop into any page
+const aiPatterns = ["OpenAI", "Claude", "GPT", "Bot", "Crawler"];
+if (aiPatterns.some(p => navigator.userAgent.includes(p))) {
+  window.location.href = `https://your-worker.workers.dev/ai-content/${slug}`;
+}
+```
+
+WordPress users: see `scripts/wordpress-ai-redirect.php`.
+
+---
+
+## Registering your own content
+
+The `blog-article-v1` schema is pre-deployed — no circuit work needed to get started.
+
+### Step 1 — Generate a BBS+ key pair (one-time)
+
+```bash
+pnpm generate-keypair
+# Save secretKey as CI secret: LEMMA_BBS_SECRET_KEY
+```
+
+### Step 2 — Normalize and commit
+
+```typescript
+import { create, schemas, define, prepare } from "@lemmaoracle/sdk";
+
+const client = create({ apiBase: "https://workers.lemma.workers.dev" });
+
+const schemaMeta = await schemas.getById(client, "blog-article-v1");
+const schema = await define(schemaMeta);
+
+const prep = await prepare(client, {
+  schema: schema.id,
+  payload: {
+    title:       "My Post",
+    author:      "did:example:you",
+    body:        "Full article text...",
+    publishedAt: "2026-04-21T12:00:00Z",
+    lang:        "en",
+  },
+});
+// prep.normalized   → { author, published, integrity, words, lang }
+// prep.commitments  → { scheme: "poseidon", root, leaves, randomness }
+```
+
+### Step 3 — Sign and create selective disclosure
+
+```typescript
+import { disclose } from "@lemmaoracle/sdk";
+
+const header   = new TextEncoder().encode("blog-article-v1");
+const messages = disclose.payloadToMessages(prep.normalized);
+
+const signed = await disclose.sign(client, {
+  messages,
+  secretKey,       // from generate-keypair
+  header,
+  issuerId: "did:example:you",
+});
+
+// Reveal title (index 5) and body (index 1) only
+const revealed = await disclose.reveal(client, {
+  signature: signed.signature,
+  messages:  signed.messages,
+  publicKey: signed.publicKey,
+  indexes:   [1, 5],
+  header,
+});
+
+const sd = disclose.toSelectiveDisclosure(revealed, {
+  publicKey: signed.publicKey,
+  header,
+  count: messages.length,
+});
+```
+
+### Step 4 — Register with Lemma
+
+```typescript
+import { documents, proofs } from "@lemmaoracle/sdk";
+
+const docHash = `0x${prep.normalized.integrity}`;
+
+await documents.register(client, {
+  schema:      schema.id,
+  docHash,
+  issuerId:    "did:example:you",
+  subjectId:   "did:example:you",
+  attributes:  prep.normalized,
+  commitments: {
+    scheme:     "poseidon",
+    root:       prep.commitments.root,
+    leaves:     prep.commitments.leaves,
+    randomness: prep.commitments.randomness,
+  },
+});
+
+await proofs.submit(client, {
+  docHash,
+  circuitId:  "blog-article-v1",
+  proof:      "",
+  inputs:     [
+    prep.normalized.author,
+    String(prep.normalized.published),
+    prep.normalized.integrity,
+    String(prep.normalized.words),
+    prep.normalized.lang,
+  ],
+  disclosure: sd,
+});
+```
+
+### GitHub Actions — auto-register on push
+
+```yaml
+name: Register articles with Lemma
+on:
+  push:
+    paths: ["content/**"]
+jobs:
+  register:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install
+      - name: Register new/changed articles
+        env:
+          LEMMA_BBS_SECRET_KEY: ${{ secrets.LEMMA_BBS_SECRET_KEY }}
+          LEMMA_API_BASE: https://workers.lemma.workers.dev
+        run: pnpm tsx scripts/register.ts
 ```
 
 ---
 
-## Advanced: Bring Your Own Data
+## Bring your own data
 
-This repository uses a blog article as an entry-point example (`blog-article-v1` schema), but the architecture generalizes to any verifiable data: credentials, sensor readings, financial attestations, or research outputs.
+`blog-article-v1` is only the entry-point schema. Lemma handles any JSON document — credentials, sensor readings, financial attestations, research outputs, on-chain events.
 
-To use Lemma-x402 for your own custom data:
-1. **Define a Schema:** Create a schema for your data structure using the Lemma SDK.
-2. **Deploy a Circuit:** Write and compile a Circom circuit to prove the specific attributes of your data.
-3. **Register:** Upload your artifacts and register them on the Lemma network.
+To define a custom schema and circuit:
+1. Write a Rust WASM normalize function (`packages/normalize`) and a Circom circuit (`packages/circuit`).
+2. Build artifacts: `wasm-pack build --target web` and `./scripts/build.sh`.
+3. Register: fill in `PINATA_API_KEY`, `PINATA_SECRET_API_KEY`, `LEMMA_API_KEY` in `.env` and run `pnpm register`.
+
+Pre-deployed schemas and circuits (no setup needed):
+
+| Type | ID | Purpose |
+| :--- | :--- | :--- |
+| Schema | `passthrough-v1` | Simple passthrough for any payload |
+| Schema | `blog-article-v1` | Blog article normalization |
+| Circuit | `x402-payment-v1` | Proves on-chain payment (Base Sepolia) |
+| Circuit | `blog-article-v1` | Verifies blog article attributes |
 
 ---
 
-## Advanced: Registering Content with Full Disclosure
+## Attribute schema (blog-article-v1)
 
-If you want to register your own custom article with full HTML/Markdown content for AI agents to access after payment, you can use the content registration script.
+| Attribute | Type | Description |
+| :--- | :--- | :--- |
+| `author` | `string` (DID) | Provable authorship identity |
+| `published` | `number` (Unix sec) | Publication timestamp for freshness checks |
+| `integrity` | `string` (SHA-256 hex) | Body content hash — tamper detection |
+| `words` | `number` | Word count |
+| `lang` | `string` (ISO 639-1) | Language |
 
-### 1. Register Content
+---
 
-Modify `scripts/register-with-full-content.ts` with your custom article data, then run:
+## API endpoints
 
-```bash
-pnpm register:content
-```
-
-This creates a document with `blog-article-v1` schema, offering both a free tier proof (title, author, date) and a paid tier proof requiring `x402-payment-v1` circuit proof (body, full content).
-
-### 2. Test the Custom Content x402 Flow
-
-**2a. Unauthenticated access → 402 Payment Required**
-```bash
-curl -s http://localhost:8787/example/verify/<your-docHash> | jq
-```
-
-**2b. Paid access → 200 OK with verified provenance**
-Generate an x402 payment, then:
-```bash
-curl -s -H "PAYMENT-SIGNATURE: <base64-encoded-payment-payload>" \
-  http://localhost:8787/example/verify/<your-docHash> | jq
-```
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/example/verify/:hash` | GET | Provenance verification — verified attributes + proof status |
+| `/example/query` | POST | BBS+ selective disclosure query |
+| `/` | GET | Health check |
 
 ---
 
 ## Network
 
-Base Sepolia (chainId 84532) — EVM-compatible, ideal for micropayment demos.
+**Base Sepolia** (`chainId: 84532`)
 
-| Resource | URL |
+| Resource | Value |
 | :--- | :--- |
-| RPC | https://sepolia.base.org |
-| Explorer | https://sepolia.basescan.org |
-| Facilitator | https://x402-facilitator.lemma.workers.dev |
-| USDC | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
+| RPC | `https://sepolia.base.org` |
+| Explorer | `https://sepolia.basescan.org` |
+| x402 Facilitator | `https://x402-facilitator.lemma.workers.dev` |
+| USDC contract | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
+
+---
+
+## Project structure
+
+```
+packages/
+  worker/     Cloudflare Worker — Hono + x402, /verify + /query endpoints
+  agent/      Node.js agent — 4-phase provenance verification demo
+  circuit/    Circom circuit — blog-article-v1 (pre-deployed)
+  normalize/  Rust WASM — rawDoc → normDoc (pre-deployed)
+scripts/
+  register.ts                   Register articles in CI
+  register-with-full-content.ts Register articles with paid-tier body access
+  generate-bbs-keypair.ts       Generate BBS+ key pair
+  generate-snippet.ts           Generate X-Lemma-Attestation header + <link> tag
+  ai-redirect.js                Client-side AI user-agent detection
+  wordpress-ai-redirect.php     WordPress plugin for server-side AI detection
+  check-balance.ts              Check agent wallet USDC balance
+```
 
 ---
 
 ## Roadmap
 
-This demo covers payment settlement, data authenticity, and selective disclosure. Lemma's schema design already carries `issuerId` / `subjectId` fields, which opens the door to:
+- **Agent DID binding** — derive `did:key` from the agent's signing key, bind to `issuerId`; every payment cryptographically linked to a specific principal.
+- **Role and policy attributes** — attach org-level roles and permission scopes as verifiable attributes for policy-gated payments.
+- **On-chain DID verification** — Circom constraint `authorHash == poseidon(did:key)` makes identity part of the ZK proof itself.
 
-- **Agent DID binding** — derive `did:key` from the agent's signing key and bind it to `issuerId`, so every payment is cryptographically linked to a specific principal.
-- **Role and policy attributes** — attach org-level roles and permission scopes as verifiable attributes, enabling policy-gated payments.
-- **On-chain DID verification** — add a Circom constraint that checks `authorHash == poseidon(did:key)` inside the circuit, making identity part of the ZK proof itself.
+---
 
-## Further Reading
-- Cryptographic Trust Chains Between Agents — A2A collaboration in the API economy
-- x402 Protocol Specification — HTTP-native payments
-- Lemma Oracle — ZK-verified data attestations
+## Further reading
+
+- [Lemma Oracle](https://lemma.frame00.com) — ZK-verified data attestations
+- [Lemma Blog: Cryptographic Trust Chains Between Agents](https://lemma.frame00.com/blog/agent-cryptographic-trust-chain-a2a-api-economy)
+- [x402 Protocol](https://x402.org) — HTTP-native micropayments
