@@ -3,5 +3,6 @@ dist/
 .wrangler/
 .env
 *.local
+.dev.vars
 .DS_Store
 package-lock.json
