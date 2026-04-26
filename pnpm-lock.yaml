@@ -71,7 +71,7 @@ importers:
         version: 9.3.0
       viem:
         specifier: ^2.21.54
-        version: 2.47.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76)
+        version: 2.47.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.3.6)
     devDependencies:
       '@types/node':
         specifier: ^22.10.5
@@ -109,14 +109,14 @@ importers:
         specifier: ^2.1.0
         version: 2.1.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@lemmaoracle/sdk':
-        specifier: file:./lemmaoracle-sdk-0.0.17.tgz
-        version: file:packages/worker/lemmaoracle-sdk-0.0.17.tgz
+        specifier: ^0.0.18
+        version: 0.0.18
       '@lemmaoracle/spec':
-        specifier: file:./lemmaoracle-spec-0.0.17.tgz
-        version: file:packages/worker/lemmaoracle-spec-0.0.17.tgz
+        specifier: ^0.0.18
+        version: 0.0.18
       '@lemmaoracle/x402':
-        specifier: file:./lemmaoracle-x402-0.1.1.tgz
-        version: file:packages/worker/lemmaoracle-x402-0.1.1.tgz(@lemmaoracle/sdk@file:packages/worker/lemmaoracle-sdk-0.0.17.tgz)(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)
+        specifier: ^0.1.2
+        version: 0.1.2(@lemmaoracle/sdk@0.0.18)(bufferutil@4.1.0)(ethers@6.16.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(typescript@5.9.3)(utf-8-validate@5.0.10)
       hono:
         specifier: ^4.6.14
         version: 4.12.12
@@ -670,22 +670,19 @@ packages:
   '@lemmaoracle/sdk@0.0.17':
     resolution: {integrity: sha512-4obeIvr/uhuE2CBO2g2TdAGEAF9MJRvqeqxxHuWcd++wGum+5JKs9HwH+EvgbNxqFJgvlDcPTGikfvdTLIfmzw==}
 
-  '@lemmaoracle/sdk@file:packages/worker/lemmaoracle-sdk-0.0.17.tgz':
-    resolution: {integrity: sha512-BDNBL28Juk6nZG/cPQTdVgFA6+2NgoH8FF8RjKUag4TcPlpAnVGjY4PON9PnQBNpQt6Rt6E7w6+T4Yc7Cv43ZQ==, tarball: file:packages/worker/lemmaoracle-sdk-0.0.17.tgz}
-    version: 0.0.17
+  '@lemmaoracle/sdk@0.0.18':
+    resolution: {integrity: sha512-w2B65BQdarlDHYm5RxaTPLV2ARNkPOdMhT2gKxNgiZ7LkEnWME3PqCguim/i67HvisYuTSx1Woza3c84pfd5NA==}
 
   '@lemmaoracle/spec@0.0.17':
     resolution: {integrity: sha512-GixLKo4WEOwsSnOhhn+zwHNFUFyw5K7KjxzUHEPdSaRjcgdhVQe8+lDeF3wrvQy0L7BvOlmOP00vAfQ3gdaamw==}
 
-  '@lemmaoracle/spec@file:packages/worker/lemmaoracle-spec-0.0.17.tgz':
-    resolution: {integrity: sha512-9MTBtEuF6lwGPcu7EkegDPQlRks9i+jr5fnb6qnUNcMh2S4qSpiSCrNsRY77GcdMh3Wy50GnEByY42cEL/zMZg==, tarball: file:packages/worker/lemmaoracle-spec-0.0.17.tgz}
-    version: 0.0.17
+  '@lemmaoracle/spec@0.0.18':
+    resolution: {integrity: sha512-hi+JuASonMU8tJYmukKnimAy0aWkRJ3m1+Z4gprYHgMqric28x9llXWoN5OC9YWDC2+GUBwQZavp4EFTEPG3jQ==}
 
-  '@lemmaoracle/x402@file:packages/worker/lemmaoracle-x402-0.1.1.tgz':
-    resolution: {integrity: sha512-ca9BoSMcj1RHRzLBQ30tRW7At4xtuul090O5OMdYl3KhmrDXhfLRsaT1/I1TKROD6Dc8q50Q9AoBALU2g7MgfA==, tarball: file:packages/worker/lemmaoracle-x402-0.1.1.tgz}
-    version: 0.1.1
+  '@lemmaoracle/x402@0.1.2':
+    resolution: {integrity: sha512-QSEej+DOB/6iz7gLvHm+E2A7rEOjeajE/ChTvKpi9uPm99UusKig66mhD//tJHpN0QoIIEFNsrmnwH5JxTwiAQ==}
     peerDependencies:
-      '@lemmaoracle/sdk': ^0.0.17
+      '@lemmaoracle/sdk': ^0.0.18
 
   '@noble/ciphers@1.3.0':
     resolution: {integrity: sha512-2I0gnIVPtfnMw9ee9h1dJG7tp81+8Ob3OJb3Mv37rx5L40/b0i7djjCVvGOVqc9AEIQyvyu1i6ypKdFw8R8gQw==}
@@ -2203,10 +2200,10 @@ snapshots:
       ramda: 0.30.1
       snarkjs: 0.7.6
 
-  '@lemmaoracle/sdk@file:packages/worker/lemmaoracle-sdk-0.0.17.tgz':
+  '@lemmaoracle/sdk@0.0.18':
     dependencies:
       '@docknetwork/crypto-wasm': 0.35.0
-      '@lemmaoracle/spec': 0.0.17
+      '@lemmaoracle/spec': 0.0.18
       '@noble/ciphers': 1.3.0
       '@noble/curves': 1.9.7
       '@noble/hashes': 1.8.0
@@ -2216,14 +2213,14 @@ snapshots:
 
   '@lemmaoracle/spec@0.0.17': {}
 
-  '@lemmaoracle/spec@file:packages/worker/lemmaoracle-spec-0.0.17.tgz': {}
+  '@lemmaoracle/spec@0.0.18': {}
 
-  '@lemmaoracle/x402@file:packages/worker/lemmaoracle-x402-0.1.1.tgz(@lemmaoracle/sdk@file:packages/worker/lemmaoracle-sdk-0.0.17.tgz)(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)':
+  '@lemmaoracle/x402@0.1.2(@lemmaoracle/sdk@0.0.18)(bufferutil@4.1.0)(ethers@6.16.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(typescript@5.9.3)(utf-8-validate@5.0.10)':
     dependencies:
-      '@lemmaoracle/sdk': file:packages/worker/lemmaoracle-sdk-0.0.17.tgz
+      '@lemmaoracle/sdk': 0.0.18
       '@x402/core': 2.10.0
       '@x402/evm': 2.10.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      '@x402/hono': 2.10.0(bufferutil@4.1.0)(hono@4.12.12)(typescript@5.9.3)(utf-8-validate@5.0.10)
+      '@x402/hono': 2.10.0(bufferutil@4.1.0)(ethers@6.16.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(hono@4.12.12)(typescript@5.9.3)(utf-8-validate@5.0.10)
       hono: 4.12.12
     transitivePeerDependencies:
       - '@x402/paywall'
@@ -2282,17 +2279,11 @@ snapshots:
       '@noble/hashes': 1.8.0
       apg-js: 4.4.0
 
-  '@signinwithethereum/siwe@4.2.0(ethers@6.16.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(viem@2.47.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76))':
+  '@signinwithethereum/siwe@4.2.0(ethers@6.16.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(viem@2.47.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.3.6))':
     dependencies:
       '@signinwithethereum/siwe-parser': 4.2.0
     optionalDependencies:
       ethers: 6.16.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
-      viem: 2.47.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76)
-
-  '@signinwithethereum/siwe@4.2.0(viem@2.47.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.3.6))':
-    dependencies:
-      '@signinwithethereum/siwe-parser': 4.2.0
-    optionalDependencies:
       viem: 2.47.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.3.6)
 
   '@sindresorhus/is@7.2.0': {}
@@ -2774,24 +2765,7 @@ snapshots:
     dependencies:
       '@noble/curves': 1.9.7
       '@scure/base': 1.2.6
-      '@signinwithethereum/siwe': 4.2.0(ethers@6.16.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(viem@2.47.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76))
-      '@x402/core': 2.10.0
-      ajv: 8.18.0
-      jose: 5.10.0
-      tweetnacl: 1.0.3
-      viem: 2.47.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76)
-      zod: 3.25.76
-    transitivePeerDependencies:
-      - bufferutil
-      - ethers
-      - typescript
-      - utf-8-validate
-
-  '@x402/extensions@2.10.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)':
-    dependencies:
-      '@noble/curves': 1.9.7
-      '@scure/base': 1.2.6
-      '@signinwithethereum/siwe': 4.2.0(viem@2.47.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.3.6))
+      '@signinwithethereum/siwe': 4.2.0(ethers@6.16.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(viem@2.47.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.3.6))
       '@x402/core': 2.10.0
       ajv: 8.18.0
       jose: 5.10.0
@@ -2818,18 +2792,6 @@ snapshots:
     dependencies:
       '@x402/core': 2.10.0
       '@x402/extensions': 2.10.0(bufferutil@4.1.0)(ethers@6.16.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(typescript@5.9.3)(utf-8-validate@5.0.10)
-      hono: 4.12.12
-      zod: 3.25.76
-    transitivePeerDependencies:
-      - bufferutil
-      - ethers
-      - typescript
-      - utf-8-validate
-
-  '@x402/hono@2.10.0(bufferutil@4.1.0)(hono@4.12.12)(typescript@5.9.3)(utf-8-validate@5.0.10)':
-    dependencies:
-      '@x402/core': 2.10.0
-      '@x402/extensions': 2.10.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)
       hono: 4.12.12
       zod: 3.25.76
     transitivePeerDependencies:
