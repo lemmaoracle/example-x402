@@ -10,9 +10,9 @@
   },
   "dependencies": {
     "@coinbase/x402": "^2.1.0",
-    "@lemmaoracle/sdk": "^0.0.19",
-    "@lemmaoracle/spec": "^0.0.19",
-    "@lemmaoracle/x402": "^0.1.3",
+    "@lemmaoracle/sdk": "^0.0.20",
+    "@lemmaoracle/spec": "^0.0.20",
+    "@lemmaoracle/x402": "^0.1.4",
     "hono": "^4.12.15"
   },
   "devDependencies": {

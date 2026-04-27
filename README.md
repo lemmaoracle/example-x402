@@ -41,7 +41,7 @@ Agent ──[GET /article]──────────────────
         Lemma Worker ◀─────────────────────────┘
               │
               ├─ Attribute proof   author, date, integrity (Poseidon commitment)
-              ├─ Payment proof     settlement confirmed on Base Sepolia
+              ├─ Payment proof     settlement via CDP facilitator on Base Sepolia
               └─ Minimal disclosure  only the fields the agent requested (BBS+)
               │
               ▼
@@ -53,7 +53,7 @@ Agent ──[GET /article]──────────────────
 | Layer | Claim | Mechanism |
 | :--- | :--- | :--- |
 | **Attribute authenticity** | Author, date, body haven't been tampered with | Poseidon Merkle commitment + SHA-256 integrity |
-| **Payment settlement** | Payment occurred for the stated amount | x402 facilitator → settle on Base Sepolia |
+| **Payment settlement** | Payment occurred for the stated amount | CDP facilitator → settle on Base Sepolia |
 | **Minimal disclosure** | Verifier sees only the requested fields | BBS+ signature over normalized attributes |
 
 A blog article is the entry-point example. The architecture generalizes to any verifiable data: credentials, sensor readings, financial attestations, research outputs, on-chain events.
@@ -67,6 +67,7 @@ Experience the 4-phase provenance verification demo where an agent pays and veri
 ### Prerequisites
 - Node.js 20+, pnpm 9+
 - Base Sepolia wallet with test USDC ([Circle Faucet](https://faucet.circle.com/))
+- CDP API key ([Coinbase Developer Platform](https://portal.cdp.coinbase.com/)) — for x402 facilitator authentication
 
 ```bash
 git clone https://github.com/lemmaoracle/example-x402
@@ -79,7 +80,16 @@ pnpm install
 ```bash
 cp .env.example .env
 # Required: PAY_TO_ADDRESS, AGENT_PRIVATE_KEY
+
+# Worker CDP credentials (for x402 facilitator auth)
+# Get keys from https://portal.cdp.coinbase.com/
+cat > packages/worker/.dev.vars << 'EOF'
+CDP_API_KEY_ID=your_key_id
+CDP_API_KEY_SECRET=your_key_secret
+EOF
 ```
+
+> The worker's `wrangler.toml` includes a demo `LEMMA_API_KEY` and `FACILITATOR_URL` pre-configured for Base Sepolia — no extra setup needed.
 
 ### 2. Start the worker
 
@@ -110,14 +120,21 @@ There are three integration approaches, from most direct to most standard:
 Apply the x402 payment middleware to your resource endpoint:
 
 ```typescript
-import { paymentMiddleware } from "@x402/hono";
-import { HTTPFacilitatorClient, x402ResourceServer } from "@x402/core/server";
-import { ExactEvmScheme } from "@x402/evm/exact/server";
+import { paymentMiddleware, HTTPFacilitatorClient, x402ResourceServer, ExactEvmScheme } from "@lemmaoracle/x402";
+import { createFacilitatorConfig } from "@coinbase/x402";
 
-const facilitator = new HTTPFacilitatorClient({
-  url: "https://x402-facilitator.lemma.workers.dev",
-});
-const resourceServer = new x402ResourceServer(facilitator)
+const facilitatorConfig = {
+  url: "https://api.cdp.coinbase.com/platform/v2/x402",
+  ...createFacilitatorConfig(CDP_API_KEY_ID, CDP_API_KEY_SECRET),
+};
+const facilitatorClient = new HTTPFacilitatorClient(facilitatorConfig);
+
+const lemmaConfig = {
+  apiKey: "your-lemma-api-key", // required for API requests
+  // apiBase defaults to "https://workers.lemma.workers.dev" via @lemmaoracle/sdk
+  // circuitId defaults to "x402-payment-v1"
+};
+const resourceServer = new x402ResourceServer(facilitatorClient, lemmaConfig)
   .register("eip155:84532", new ExactEvmScheme());
 
 const routes = {
@@ -283,7 +300,7 @@ jobs:
         env:
           LEMMA_BBS_SECRET_KEY: ${{ secrets.LEMMA_BBS_SECRET_KEY }}
           LEMMA_API_BASE: https://workers.lemma.workers.dev
-        run: pnpm tsx scripts/register.ts
+        run: pnpm tsx scripts/register-with-full-content.ts
 ```
 
 ---
@@ -338,7 +355,7 @@ Pre-deployed schemas and circuits (no setup needed):
 | :--- | :--- |
 | RPC | `https://sepolia.base.org` |
 | Explorer | `https://sepolia.basescan.org` |
-| x402 Facilitator | `https://x402-facilitator.lemma.workers.dev` |
+| x402 Facilitator | `https://api.cdp.coinbase.com/platform/v2/x402` (CDP) |
 | USDC contract | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
 
 ---
@@ -347,18 +364,22 @@ Pre-deployed schemas and circuits (no setup needed):
 
 ```
 packages/
-  worker/     Cloudflare Worker — Hono + x402, /verify + /query endpoints
+  worker/     Cloudflare Worker — Hono + @lemmaoracle/x402, /verify + /query endpoints
   agent/      Node.js agent — 4-phase provenance verification demo
   circuit/    Circom circuit — blog-article-v1 (pre-deployed)
   normalize/  Rust WASM — rawDoc → normDoc (pre-deployed)
 scripts/
-  register.ts                   Register articles in CI
+  register-lemma-artifacts.mjs  Upload WASM/zkey to IPFS, register schema+circuit
+  register-schema.ts            Register blog-article-v1 schema with Lemma
+  register-circuit.ts           Register blog-article-v1 circuit with Lemma
   register-with-full-content.ts Register articles with paid-tier body access
   generate-bbs-keypair.ts       Generate BBS+ key pair
   generate-snippet.ts           Generate X-Lemma-Attestation header + <link> tag
+  check-balance.ts              Check agent wallet USDC balance
+  test-worker-endpoints.js      Test worker endpoints locally
+  test-ai-detection.js          Test AI user-agent detection
   ai-redirect.js                Client-side AI user-agent detection
   wordpress-ai-redirect.php     WordPress plugin for server-side AI detection
-  check-balance.ts              Check agent wallet USDC balance
 ```
 
 ---

@@ -9,11 +9,11 @@ importers:
   .:
     dependencies:
       '@lemmaoracle/sdk':
-        specifier: 0.0.19
-        version: 0.0.19
+        specifier: 0.0.20
+        version: 0.0.20
       '@lemmaoracle/spec':
-        specifier: 0.0.19
-        version: 0.0.19
+        specifier: 0.0.20
+        version: 0.0.20
       chalk:
         specifier: ^5.6.2
         version: 5.6.2
@@ -109,14 +109,14 @@ importers:
         specifier: ^2.1.0
         version: 2.1.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@lemmaoracle/sdk':
-        specifier: ^0.0.19
-        version: 0.0.19
+        specifier: ^0.0.20
+        version: 0.0.20
       '@lemmaoracle/spec':
-        specifier: ^0.0.19
-        version: 0.0.19
+        specifier: ^0.0.20
+        version: 0.0.20
       '@lemmaoracle/x402':
-        specifier: ^0.1.3
-        version: 0.1.3(@lemmaoracle/sdk@0.0.19)(bufferutil@4.1.0)(ethers@6.16.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(typescript@5.9.3)(utf-8-validate@5.0.10)
+        specifier: ^0.1.4
+        version: 0.1.4(@lemmaoracle/sdk@0.0.20)(bufferutil@4.1.0)(ethers@6.16.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(typescript@5.9.3)(utf-8-validate@5.0.10)
       hono:
         specifier: ^4.12.15
         version: 4.12.15
@@ -667,16 +667,16 @@ packages:
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
 
-  '@lemmaoracle/sdk@0.0.19':
-    resolution: {integrity: sha512-dCRr2dQmSxRjnE2z/9Vo7ZDugsP/PF6a2VZeElBop1G17pgeKCZfSdjYELHuAReGheS1I0qPfD5IeO8mNFVhIQ==}
+  '@lemmaoracle/sdk@0.0.20':
+    resolution: {integrity: sha512-QsNbYLTPfcg6XWeLKTGNA7lzrxCaPpTDWWY43bUEj1297NTRolgnSGIemdfg3xxJvF0Qg7DsNNkwR19Iv0LyaA==}
 
-  '@lemmaoracle/spec@0.0.19':
-    resolution: {integrity: sha512-vh7wyYZUlitZvqdtSU4vAAkVPAzEKaEkNFrbJ5XzMeY7njZ5mF2T+/Rj0V3w10+CRhluNhgT/ivpX9cyGnMljQ==}
+  '@lemmaoracle/spec@0.0.20':
+    resolution: {integrity: sha512-QxQ1csdYlwukbZEuRmILuvc+DYwMIMcN65tPaJY8obxSoKtOGmKnY27P2663Kx+u/P698hFdfpLkLmsb41o7Sg==}
 
-  '@lemmaoracle/x402@0.1.3':
-    resolution: {integrity: sha512-QEn/3URwtQvjxq+l6yyGhpNNFHonAzJrajkWuvpcqHUTxQ7WsChpqne/Fzd45eOb4ebK5jmIaL8TCkhsPuiuEA==}
+  '@lemmaoracle/x402@0.1.4':
+    resolution: {integrity: sha512-qWztkLNDd6oKh3V2FCMwhtcWiMGKUmkLdhqcEWFlxISUm/X67dTNvzNyw/4zxEEhEaixf6J+IOn4y6EgyKi5+g==}
     peerDependencies:
-      '@lemmaoracle/sdk': ^0.0.19
+      '@lemmaoracle/sdk': ^0.0.20
 
   '@noble/ciphers@1.3.0':
     resolution: {integrity: sha512-2I0gnIVPtfnMw9ee9h1dJG7tp81+8Ob3OJb3Mv37rx5L40/b0i7djjCVvGOVqc9AEIQyvyu1i6ypKdFw8R8gQw==}
@@ -2186,10 +2186,10 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@lemmaoracle/sdk@0.0.19':
+  '@lemmaoracle/sdk@0.0.20':
     dependencies:
       '@docknetwork/crypto-wasm': 0.35.0
-      '@lemmaoracle/spec': 0.0.19
+      '@lemmaoracle/spec': 0.0.20
       '@noble/ciphers': 1.3.0
       '@noble/curves': 1.9.7
       '@noble/hashes': 1.8.0
@@ -2197,11 +2197,11 @@ snapshots:
       ramda: 0.30.1
       snarkjs: 0.7.6
 
-  '@lemmaoracle/spec@0.0.19': {}
+  '@lemmaoracle/spec@0.0.20': {}
 
-  '@lemmaoracle/x402@0.1.3(@lemmaoracle/sdk@0.0.19)(bufferutil@4.1.0)(ethers@6.16.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(typescript@5.9.3)(utf-8-validate@5.0.10)':
+  '@lemmaoracle/x402@0.1.4(@lemmaoracle/sdk@0.0.20)(bufferutil@4.1.0)(ethers@6.16.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(typescript@5.9.3)(utf-8-validate@5.0.10)':
     dependencies:
-      '@lemmaoracle/sdk': 0.0.19
+      '@lemmaoracle/sdk': 0.0.20
       '@x402/core': 2.10.0
       '@x402/evm': 2.10.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@x402/hono': 2.10.0(bufferutil@4.1.0)(ethers@6.16.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(hono@4.12.15)(typescript@5.9.3)(utf-8-validate@5.0.10)

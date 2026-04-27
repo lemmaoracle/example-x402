@@ -17,8 +17,8 @@
     "generate-snippet": "tsx scripts/generate-snippet.ts"
   },
   "dependencies": {
-    "@lemmaoracle/sdk": "0.0.19",
-    "@lemmaoracle/spec": "0.0.19",
+    "@lemmaoracle/sdk": "0.0.20",
+    "@lemmaoracle/spec": "0.0.20",
     "chalk": "^5.6.2",
     "cli-spinners": "^3.4.0",
     "ora": "^9.4.0",
