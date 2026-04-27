@@ -72,7 +72,8 @@ async function registerArticleWithFullContent(article: {
   });
   
   // Free tier: reveal only basic attributes
-  const freeIndexes = [0, 4, 5]; // author, published, title
+  // payloadToMessages maps to: 0=author, 1=body, 2=fullContent, 3=integrity, 4=lang, 5=published, 6=title, 7=words
+  const freeIndexes = [0, 4, 5]; // author, lang, published
   const freeDisclosure = await disclose.reveal(client, {
     signature: signed.signature,
     messages: signed.messages,
@@ -82,7 +83,7 @@ async function registerArticleWithFullContent(article: {
   });
   
   // Paid tier: reveal body and full content
-  const paidIndexes = [1, 7]; // body, fullContent
+  const paidIndexes = [1, 2]; // body, fullContent
   const paidDisclosure = await disclose.reveal(client, {
     signature: signed.signature,
     messages: signed.messages,
@@ -117,20 +118,16 @@ const docHash = `0x${normalized.integrity as string}`;
   // condition: x402-payment-v1 requires on-chain payment proof to disclose
   // Without proof: only basic attributes are visible
   // With proof: body and fullContent are disclosed
+  //
+  // blog-article-v1 circuit:
+  //   private inputs: authorHash, published, integrityHash, words, langCode
+  //   public input:  commitment = Poseidon5(all private inputs)
+  // The SDK's prepare() already computes this as prep.commitments.root.
   await proofs.submit(client, {
     docHash,
     circuitId: "blog-article-v1",
     proof: "", // Placeholder for production
-    inputs: [
-      normalized.author as string,
-      normalized.body as string,
-      normalized.integrity as string,
-      String(normalized.words),
-      normalized.lang as string,
-      normalized.title as string,
-      String(normalized.published),
-      normalized.fullContent as string,
-    ],
+    inputs: [prep.commitments.root],
     disclosure: disclose.toSelectiveDisclosure(paidDisclosure, {
       publicKey: signed.publicKey,
       header: new TextEncoder().encode("blog-article-v1"),
@@ -154,7 +151,7 @@ const docHash = `0x${normalized.integrity as string}`;
 const exampleArticle = {
   title: "The Future of AI and Blockchain",
   author: "did:example:alice",
-  body: "Artificial intelligence and blockchain technology are converging to create new possibilities for trust and automation. This convergence enables verifiable provenance and transparent content attribution.",
+  body: "Decentralized oracle networks and zero-knowledge proofs are unlocking new paradigms for verifiable computation and trustworthy data feeds. On-chain provenance ensures that AI agents can rely on cryptographically anchored information without any trusted intermediaries.",
   publishedAt: "2026-04-08T14:30:00Z",
   lang: "en",
   fullContent: `
@@ -167,15 +164,15 @@ const exampleArticle = {
 <body>
   <article>
     <h1>The Future of AI and Blockchain</h1>
-    <p class="author">By Alice · April 8, 2026</p>
+    <p class="author">By Alice &middot; April 8, 2026</p>
     
-    <p>Artificial intelligence and blockchain technology are converging to create new possibilities for trust and automation.</p>
+    <p>Decentralized oracle networks and zero-knowledge proofs are unlocking new paradigms for verifiable computation and trustworthy data feeds.</p>
     
     <h2>Trust in the Age of AI</h2>
-    <p>As AI agents become more prevalent on the web, establishing trust becomes critical. Traditional methods like watermarking are fragile and can be removed with simple paraphrasing.</p>
+    <p>As AI agents become more prevalent on the web, establishing trust becomes critical. Traditional methods like watermarking are fragile and can be circumvented with simple paraphrasing. On-chain provenance ensures that information is anchored to a cryptographic commitment.</p>
     
     <h2>ZK Proofs for Provenance</h2>
-    <p>Zero-knowledge proofs offer a mathematical guarantee of content provenance. With Lemma's selective disclosure, AI agents can verify authorship and publication date without accessing the full content.</p>
+    <p>Zero-knowledge proofs offer a mathematical guarantee of content provenance. With Lemma's selective disclosure, AI agents can verify authorship and publication date without accessing the full content beforehand.</p>
     
     <h2>Micropayments for Access</h2>
     <p>The x402 protocol enables AI agents to pay micro-fees for access to verified content. This creates sustainable monetization for content creators while maintaining free access for human readers.</p>

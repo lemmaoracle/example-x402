@@ -120,6 +120,13 @@ const extractPaymentResponse = (
 // ---------------------------------------------------------------------------
 // Utility: sleep and typewrite for CLI effects
 // ---------------------------------------------------------------------------
+/** Truncate long strings: keep first/last N chars with "…<N omitted>…" in between. */
+const truncateValue = (value: string, head = 80, tail = 80): string => {
+  if (value.length <= head + tail + 15) return value;
+  const omitted = value.length - head - tail;
+  return `${value.slice(0, head)}…<${omitted} omitted>…${value.slice(-tail)}`;
+};
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const typewrite = async (
@@ -138,7 +145,7 @@ const typewrite = async (
 // Phase 1: Fetch blog content freely
 // ---------------------------------------------------------------------------
 // Demo content (must match worker's DEMO_CONTENT)
-const DEMO_CONTENT = `Artificial intelligence and blockchain technology are converging to create new possibilities for trust and automation. This convergence enables verifiable provenance and transparent content attribution.`;
+const DEMO_CONTENT = `Decentralized oracle networks and zero-knowledge proofs are unlocking new paradigms for verifiable computation and trustworthy data feeds. On-chain provenance ensures that AI agents can rely on cryptographically anchored information without any trusted intermediaries.`;
 
 const phase1_fetchContent = async (): Promise<{
   content: string;
@@ -287,7 +294,8 @@ const phase3_verify = async (
     spinner.succeed(chalk.green("Payment accepted. Verified attributes received."));
 
     // Extract settlement proof from PAYMENT-RESPONSE header for disclosure queries
-    const paymentResponse = extractPaymentResponse(response.headers.get("PAYMENT-RESPONSE"));
+    const paymentResponseRaw = response.headers.get("PAYMENT-RESPONSE");
+    const paymentResponse = extractPaymentResponse(paymentResponseRaw);
     const settlementProof = paymentResponse?.extensions?.lemma;
 
     return {
@@ -352,7 +360,7 @@ const phase4_confirmTrust = async (
   await sleep(130);
   for (const [key, value] of Object.entries(attributes)) {
     process.stdout.write(`  ${chalk.gray(key)}: `);
-    const valueStr = String(value);
+    const valueStr = truncateValue(String(value));
     if (valueStr.length > 40) {
       await typewrite(valueStr, chalk.white, 2, 10);
     } else {
@@ -482,7 +490,7 @@ const advancedDisclosure = async (
       if (sd.attributes && Object.keys(sd.attributes).length > 0) {
         for (const [k, v] of Object.entries(sd.attributes)) {
           process.stdout.write(`      ${chalk.gray(k)}: `);
-          const vStr = String(v);
+          const vStr = truncateValue(String(v));
           if (vStr.length > 40) {
             await typewrite(vStr, chalk.green, 2, 10);
           } else {
@@ -499,7 +507,7 @@ const advancedDisclosure = async (
       await sleep(50);
       for (const [k, v] of Object.entries(item.disclosed)) {
         process.stdout.write(`      ${chalk.gray(k)}: `);
-        const vStr = String(v);
+        const vStr = truncateValue(String(v));
         if (vStr.length > 40) {
           await typewrite(vStr, chalk.white, 2, 10);
         } else {
@@ -530,7 +538,7 @@ const main = async (): Promise<void> => {
   // Use discovered attestation URL, or fall back to demo URL
   const verifyUrl =
     attestationUrl ||
-    `${WORKER_URL}/example/verify/0xc6b3380e0d8334e87c3e55d23e987dc0b7638e91950a2467b2bb496e62ac6fdd`;
+    `${WORKER_URL}/example/verify/0x1913a42fc34ded666481c07b88a56687d787ecdbf8c97a1604b6d7ffb7aabd42`;
 
   const verifyResult = await phase3_verify(verifyUrl);
 
@@ -547,7 +555,7 @@ const main = async (): Promise<void> => {
   // Advanced: BBS+ selective disclosure (optional)
   if (WITH_DISCLOSURE) {
     await advancedDisclosure(
-      verifyResult ? verifyResult.docHash : "0xc6b3380e0d8334e87c3e55d23e987dc0b7638e91950a2467b2bb496e62ac6fdd",
+      verifyResult ? verifyResult.docHash : "0x1913a42fc34ded666481c07b88a56687d787ecdbf8c97a1604b6d7ffb7aabd42",
       verifyResult?.settlementProof,
     );
   }

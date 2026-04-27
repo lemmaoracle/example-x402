@@ -31,6 +31,7 @@ type Env = {
   readonly FACILITATOR_URL: string;
   readonly LEMMA_API_BASE: string;
   readonly LEMMA_API_KEY?: string;
+  readonly LEMMA_RELAY_URL?: string;
   readonly DEMO_MODE?: string;
   readonly LEMMA_DISCOVERY_CONFIG?: string;
   readonly CDP_API_KEY_ID?: string;
@@ -141,9 +142,9 @@ const lemmaHeaders = (apiKey?: string): Record<string, string> => ({
 // ---------------------------------------------------------------------------
 
 const DEMO_CONTENT =
-  "Artificial intelligence and blockchain technology are converging to create new possibilities for trust and automation. This convergence enables verifiable provenance and transparent content attribution.";
+  "Decentralized oracle networks and zero-knowledge proofs are unlocking new paradigms for verifiable computation and trustworthy data feeds. On-chain provenance ensures that AI agents can rely on cryptographically anchored information without any trusted intermediaries.";
 const DEMO_CONTENT_HASH =
-  "c6b3380e0d8334e87c3e55d23e987dc0b7638e91950a2467b2bb496e62ac6fdd";
+  "1913a42fc34ded666481c07b88a56687d787ecdbf8c97a1604b6d7ffb7aabd42";
 
 const mockVerifyData = (hash: string): LemmaQueryResponse => ({
   results: [
@@ -157,7 +158,7 @@ const mockVerifyData = (hash: string): LemmaQueryResponse => ({
         author: "did:example:alice",
         published: 1775658600,
         integrity: DEMO_CONTENT_HASH,
-        words: 24,
+        words: 33,
         lang: "en",
         content_type: "html",
       },
@@ -179,7 +180,7 @@ const mockQueryData = (): LemmaQueryResponse => ({
         author: "did:example:alice",
         published: 1775658600,
         integrity: DEMO_CONTENT_HASH,
-        words: 24,
+        words: 33,
         lang: "en",
         content_type: "html",
       },
@@ -226,6 +227,7 @@ const staticRoutes = {
     ],
     description: "Verified provenance attributes for a Lemma-attested document",
     mimeType: "application/json",
+    extensions: { lemma: {} },
   },
   "POST /example/query": {
     accepts: [
@@ -242,6 +244,7 @@ const staticRoutes = {
     ],
     description: "ZK-verified blog articles with BBS+ selective disclosure",
     mimeType: "application/json",
+    extensions: { lemma: {} },
   },
 };
 
@@ -282,7 +285,13 @@ if (c.req.path === "/" || demoMode) {
 
     const facilitatorClient = new HTTPFacilitatorClient(facilitatorConfig);
 
-    const resourceServer = new x402ResourceServer(facilitatorClient)
+    const lemmaConfig = {
+      apiBase: c.env.LEMMA_API_BASE,
+      apiKey: c.env.LEMMA_API_KEY,
+      relayUrl: c.env.LEMMA_RELAY_URL,
+      circuitId: "x402-payment-v1",
+    };
+    const resourceServer = new x402ResourceServer(facilitatorClient, lemmaConfig)
       .register("eip155:84532", new ExactEvmScheme());
 
     // Inject payTo dynamically (not hardcoded in static routes)
@@ -324,22 +333,18 @@ app.get("/example/verify/:hash", async (c) => {
     return c.json({ results: data.results.map(toVerifyItem) });
   }
 
-  console.log("[DEBUG] /verify fetching from Lemma API:", apiBase);
   const raw = await fetch(`${apiBase}/v1/verified-attributes/query`, {
     method: "POST",
     headers: lemmaHeaders(apiKey),
     body: JSON.stringify({ attributes: [], docHash: hash }),
   });
-  console.log("[DEBUG] /verify Lemma API status:", raw.status, raw.statusText);
 
   if (!raw.ok) {
     const errText = await raw.text();
-    console.log("[DEBUG] /verify Lemma API error:", errText);
     return c.json({ results: [], hasMore: false });
   }
 
   const data = await raw.json() as LemmaQueryResponse;
-  console.log("[DEBUG] /verify Lemma API result count:", data.results?.length ?? 0);
   return c.json({ results: data.results.map(toVerifyItem) });
 });
 
@@ -357,7 +362,6 @@ app.post("/example/query", async (c) => {
   }
 
   const callerBody = await c.req.json<Record<string, unknown>>().catch(() => ({}));
-  console.log("[DEBUG] /query received body:", JSON.stringify(callerBody, null, 2));
 
   const response = await fetch(`${apiBase}/v1/verified-attributes/query`, {
     method: "POST",
@@ -371,7 +375,6 @@ app.post("/example/query", async (c) => {
         return c.json({ results: typed.results.map(simplifyItem), hasMore: typed.hasMore });
       })
     : response.text().then((error: string) => {
-        console.log("[DEBUG] Lemma API error response:", error);
         return c.json({ error }, response.status as 500);
       });
 });

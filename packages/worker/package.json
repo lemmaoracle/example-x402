@@ -9,14 +9,14 @@
   },
   "dependencies": {
     "@coinbase/x402": "^2.1.0",
-    "@lemmaoracle/sdk": "^0.0.18",
-    "@lemmaoracle/spec": "^0.0.18",
-    "@lemmaoracle/x402": "^0.1.2",
-    "hono": "^4.6.14"
+    "@lemmaoracle/sdk": "^0.0.19",
+    "@lemmaoracle/spec": "^0.0.19",
+    "@lemmaoracle/x402": "^0.1.3",
+    "hono": "^4.12.15"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260408.1",
-    "typescript": "^5.7.3",
+    "@cloudflare/workers-types": "^4.20260426.1",
+    "typescript": "^5.9.3",
     "wrangler": "^4.85.0"
   }
 }
