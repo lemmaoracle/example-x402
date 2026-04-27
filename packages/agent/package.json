@@ -1,6 +1,7 @@
 {
   "name": "@example-x402/agent",
   "private": true,
+  "license": "Apache-2.0",
   "version": "0.1.0",
   "type": "module",
   "scripts": {
