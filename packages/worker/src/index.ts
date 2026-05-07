@@ -32,7 +32,6 @@ type Env = {
   readonly LEMMA_API_BASE: string;
   readonly LEMMA_API_KEY?: string;
   readonly LEMMA_RELAY_URL?: string;
-  readonly DEMO_MODE?: string;
   readonly LEMMA_DISCOVERY_CONFIG?: string;
   readonly CDP_API_KEY_ID?: string;
   readonly CDP_API_KEY_SECRET?: string;
@@ -138,74 +137,6 @@ const lemmaHeaders = (apiKey?: string): Record<string, string> => ({
 });
 
 // ---------------------------------------------------------------------------
-// Demo mode mock data
-// ---------------------------------------------------------------------------
-
-const DEMO_CONTENT =
-  "Decentralized oracle networks and zero-knowledge proofs are unlocking new paradigms for verifiable computation and trustworthy data feeds. On-chain provenance ensures that AI agents can rely on cryptographically anchored information without any trusted intermediaries.";
-const DEMO_CONTENT_HASH =
-  "1913a42fc34ded666481c07b88a56687d787ecdbf8c97a1604b6d7ffb7aabd42";
-
-const mockVerifyData = (hash: string): LemmaQueryResponse => ({
-  results: [
-    {
-      docHash: hash,
-      schema: "blog-article",
-      issuerId: "did:example:lemma",
-      subjectId: "did:example:blog-author",
-      attributes: {
-        title: "The Future of AI and Blockchain",
-        author: "did:example:alice",
-        published: 1775658600,
-        integrity: DEMO_CONTENT_HASH,
-        words: 33,
-        lang: "en",
-        content_type: "html",
-      },
-      proof: { circuitId: "blog-article-v1" },
-    },
-  ],
-  hasMore: false,
-});
-
-const mockQueryData = (): LemmaQueryResponse => ({
-  results: [
-    {
-      docHash: `0x${DEMO_CONTENT_HASH}`,
-      schema: "blog-article",
-      issuerId: "did:example:lemma",
-      subjectId: "did:example:blog-author",
-      attributes: {
-        title: "The Future of AI and Blockchain",
-        author: "did:example:alice",
-        published: 1775658600,
-        integrity: DEMO_CONTENT_HASH,
-        words: 33,
-        lang: "en",
-        content_type: "html",
-      },
-      disclosure: {
-        format: "BBS+",
-        attributes: {
-          author: "did:example:alice",
-          lang: "en",
-          published: 1775658600,
-          body: DEMO_CONTENT,
-          fullContent: "<html>...</html>",
-        },
-        proof: "mock-bbs-proof",
-        publicKey: "mock-public-key",
-        indexes: [0, 3, 4, 1, 7],
-        count: 8,
-        header: "blog-article-v1",
-        condition: { circuitId: "x402-payment-v1" },
-      },
-    },
-  ],
-  hasMore: false,
-});
-
-// ---------------------------------------------------------------------------
 // Routes -- standard x402 RoutesConfig.
 // Discovery metadata (lemma extensions) is auto-enriched by
 // @lemmaoracle/x402 paymentMiddleware from LEMMA_DISCOVERY_CONFIG env var.
@@ -257,7 +188,7 @@ const app = new Hono<{ Bindings: Env }>();
 /**
  * Resolve payTo dynamically from env and apply x402 payment middleware.
  *
- * - Demo mode / health check: skip entirely
+ * - Health check: skip entirely
  * - /query endpoint: skip (uses client-provided disclosure proof from /verify)
  * - Otherwise: standard x402 payment flow via @lemmaoracle/x402
  *
@@ -265,12 +196,10 @@ const app = new Hono<{ Bindings: Env }>();
  * The augmented paymentMiddleware auto-enriches routes with discovery metadata.
  */
 app.use("*", async (c, next) => {
-  const demoMode = c.env.DEMO_MODE === "true";
-
-// Skip x402 for health check and demo mode only
-if (c.req.path === "/" || demoMode) {
+  // Skip x402 for health check only
+  if (c.req.path === "/") {
     return next();
-}
+  }
 
   try {
     // Use @coinbase/x402 for automatic CDP facilitator authentication.
@@ -326,12 +255,6 @@ app.get("/example/verify/:hash", async (c) => {
   const hash = c.req.param("hash");
   const apiBase = c.env.LEMMA_API_BASE.replace(/\/$/, "");
   const apiKey = c.env.LEMMA_API_KEY;
-  const demoMode = c.env.DEMO_MODE === "true";
-
-  if (demoMode) {
-    const data = mockVerifyData(hash);
-    return c.json({ results: data.results.map(toVerifyItem) });
-  }
 
   const raw = await fetch(`${apiBase}/v1/verified-attributes/query`, {
     method: "POST",
@@ -354,12 +277,6 @@ app.get("/example/verify/:hash", async (c) => {
 app.post("/example/query", async (c) => {
   const apiBase = c.env.LEMMA_API_BASE.replace(/\/$/, "");
   const apiKey = c.env.LEMMA_API_KEY;
-  const demoMode = c.env.DEMO_MODE === "true";
-
-  if (demoMode) {
-    const data = mockQueryData();
-    return c.json({ results: data.results.map(simplifyItem), hasMore: data.hasMore });
-  }
 
   const callerBody = await c.req.json<Record<string, unknown>>().catch(() => ({}));
 

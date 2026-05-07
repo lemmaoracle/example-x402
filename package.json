@@ -14,7 +14,8 @@
     "register:all": "pnpm register:schema && pnpm register:circuit",
     "register:content": "tsx scripts/register-with-full-content.ts",
     "generate-keypair": "tsx scripts/generate-bbs-keypair.ts",
-    "generate-snippet": "tsx scripts/generate-snippet.ts"
+    "generate-snippet": "tsx scripts/generate-snippet.ts",
+    "test": "pnpm --filter @example-x402/worker test && pnpm --filter @example-x402/agent test"
   },
   "dependencies": {
     "@lemmaoracle/sdk": "0.0.21",

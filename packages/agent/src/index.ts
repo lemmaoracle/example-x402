@@ -39,7 +39,6 @@ let AGENT_PRIVATE_KEY = process.env.AGENT_PRIVATE_KEY as
 const BLOG_URL =
   process.env.BLOG_URL || "https://example-blog.com/articles/zk-proofs";
 const WITH_DISCLOSURE = process.argv.includes("--with-disclosure");
-const DEMO_MODE = process.env.DEMO_MODE === "true" || process.env.DEMO_MODE === "1";
 
 if (!WORKER_URL) {
   console.error("Error: WORKER_URL environment variable is required.");
@@ -50,14 +49,12 @@ if (!WORKER_URL) {
   process.exit(1);
 }
 
-// Require AGENT_PRIVATE_KEY (no demo mode fallback)
+// Require AGENT_PRIVATE_KEY
 if (!AGENT_PRIVATE_KEY) {
   console.error("Error: AGENT_PRIVATE_KEY environment variable is required.");
   console.error("Set it to a wallet with Base Sepolia USDC.");
   console.error("");
   console.error("Get test USDC from: https://faucet.circle.com (select Base Sepolia)");
-  console.error("");
-  console.error("For local testing without real payments, set DEMO_MODE=true in worker config.");
   process.exit(1);
 }
 
@@ -222,7 +219,7 @@ const phase2_displayUnverified = (
   );
   console.log(`  Status: ${chalk.bgRed.white.bold(" UNVERIFIED ")}`);
   console.log(
-    chalk.gray(`  Attestation URL: ${attestationUrl || "(not discovered - using demo mode)"}`),
+    chalk.gray(`  Attestation URL: ${attestationUrl || "(not discovered)"}`),
   );
   if (schema) {
     console.log(chalk.gray(`  Schema: ${schema}`));
@@ -343,7 +340,7 @@ const phase4_confirmTrust = async (
   await sleep(150);
   
   const matchColor = integrityMatch ? chalk.green : chalk.yellow;
-  const matchText = integrityMatch ? "YES" : "NO (content may have been modified, or demo mode)";
+  const matchText = integrityMatch ? "YES" : "NO (content may have been modified)";
   console.log(`  Integrity match:  ${matchColor(matchText)}`);
   await sleep(130);
   
