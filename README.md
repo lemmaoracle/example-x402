@@ -97,8 +97,6 @@ EOF
 pnpm dev:worker   # → http://localhost:8787
 ```
 
-> Set `DEMO_MODE=true` in `packages/worker/.dev.vars` to skip real payment verification during local development.
-
 ### 3. Run the agent
 
 ```bash
