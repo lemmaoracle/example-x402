@@ -8,6 +8,7 @@
  * Endpoints:
  *   GET  /example/verify/:hash  -- Provenance verification ($0.001 USDC)
  *   POST /example/query         -- Full BBS+ selective disclosure ($0.001 USDC)
+ *   GET  /example/kyc-check     -- KYC attribute verification ($0.001 USDC)
  *   GET  /                      -- Health check
  *
  * Content is free. Trust costs $0.001.
@@ -21,6 +22,13 @@ import {
   ExactEvmScheme,
 } from "@lemmaoracle/x402";
 import { createFacilitatorConfig } from "@coinbase/x402";
+import {
+  verifyKycGate,
+  KycGates,
+  extractCredential,
+  type KycVerificationResult,
+  type KycGateConfig,
+} from "./kyc/index.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -177,6 +185,23 @@ const staticRoutes = {
     mimeType: "application/json",
     extensions: { lemma: {} },
   },
+  "GET /example/kyc-check": {
+    accepts: [
+      {
+        scheme: "exact" as const,
+        price: "$0.001",
+        network: "eip155:84532" as const,
+        payTo: "", // resolved dynamically below
+        extra: {
+          name: "USDC",
+          version: "2",
+        },
+      },
+    ],
+    description: "KYC attribute verification from identity proof",
+    mimeType: "application/json",
+    extensions: { lemma: { requiresIdentity: true } },
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -235,6 +260,12 @@ app.use("*", async (c, next) => {
       "POST /example/query": {
         ...staticRoutes["POST /example/query"],
         accepts: staticRoutes["POST /example/query"].accepts.map(
+          (accept) => ({ ...accept, payTo }),
+        ),
+      },
+      "GET /example/kyc-check": {
+        ...staticRoutes["GET /example/kyc-check"],
+        accepts: staticRoutes["GET /example/kyc-check"].accepts.map(
           (accept) => ({ ...accept, payTo }),
         ),
       },
@@ -297,6 +328,43 @@ app.post("/example/query", async (c) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /example/kyc-check -- KYC attribute verification endpoint
+// ---------------------------------------------------------------------------
+app.get("/example/kyc-check", async (c) => {
+  // Extract credential from payment headers
+  const headers: Record<string, string | undefined> = {};
+  c.req.raw.headers.forEach((v, k) => {
+    headers[k] = v;
+  });
+
+  const credential = extractCredential(headers);
+
+  if (!credential) {
+    return c.json<KycVerificationResult>(
+      {
+        verified: false,
+        roles: [],
+        scopes: [],
+        permissions: [],
+        reason: "No credential found in payment headers",
+      },
+      403,
+    );
+  }
+
+  // Use basic KYC gate by default, but allow customization via query params
+  const gateParam = c.req.query("gate");
+  const gate: KycGateConfig =
+    gateParam && gateParam in KycGates
+      ? KycGates[gateParam as keyof typeof KycGates]
+      : KycGates.basic;
+
+  const result = verifyKycGate(credential, gate);
+
+  return c.json<KycVerificationResult>(result, result.verified ? 200 : 403);
+});
+
+// ---------------------------------------------------------------------------
 // Health check
 // ---------------------------------------------------------------------------
 app.get("/", (c) =>
@@ -307,6 +375,7 @@ app.get("/", (c) =>
     endpoints: {
       verify: "GET /example/verify/:hash (provenance verification)",
       query: "POST /example/query (BBS+ selective disclosure)",
+      kycCheck: "GET /example/kyc-check (KYC attribute verification)",
       health: "GET /",
     },
   }),

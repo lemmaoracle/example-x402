@@ -1,3 +1,6 @@
 [submodule "packages/circuit/lib/forge-std"]
 	path = packages/circuit/lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
+[submodule "vendors/trust402"]
+	path = vendors/trust402
+	url = https://github.com/lemmaoracle/trust402.git
