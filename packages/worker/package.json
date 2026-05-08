@@ -11,13 +11,16 @@
   },
   "dependencies": {
     "@coinbase/x402": "^2.1.0",
+    "@lemmaoracle/agent": "^0.0.24-alpha.1",
     "@lemmaoracle/sdk": "^0.0.21",
     "@lemmaoracle/spec": "^0.0.21",
     "@lemmaoracle/x402": "^0.1.6",
-    "hono": "^4.12.15"
+    "hono": "^4.12.15",
+    "ramda": "^0.30.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260426.1",
+    "@types/ramda": "^0.30.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4",
     "wrangler": "^4.85.0"
