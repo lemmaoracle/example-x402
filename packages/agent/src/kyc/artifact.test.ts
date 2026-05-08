@@ -2,12 +2,13 @@
  * KYC module tests — Identity artifact creation and verification.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   buildKycCredential,
   type BuildCredentialInput,
 } from "./artifact.js";
 import type { KycRole, KycScope, KycPermission, KycCredential } from "./types.js";
+import type { AgentCredential } from "@lemmaoracle/agent";
 
 // ---------------------------------------------------------------------------
 // Test fixtures

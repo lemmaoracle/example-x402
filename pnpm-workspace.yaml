@@ -1,2 +1,3 @@
 packages:
   - "packages/*"
+  - "vendors/trust402/packages/*"

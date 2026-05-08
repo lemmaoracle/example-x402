@@ -11,6 +11,9 @@
   "dependencies": {
     "@lemmaoracle/agent": "^0.0.24-alpha.1",
     "@lemmaoracle/sdk": "^0.0.23",
+    "@trust402/identity": "workspace:*",
+    "@trust402/protocol": "workspace:*",
+    "@trust402/roles": "workspace:*",
     "@x402/core": "^2.10.0",
     "@x402/evm": "^2.10.0",
     "@x402/fetch": "^2.10.0",

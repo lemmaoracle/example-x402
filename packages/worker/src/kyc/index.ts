@@ -3,8 +3,10 @@
  */
 
 export {
+  IDENTITY_ARTIFACT_HEADER,
   IDENTITY_PROOF_HEADER,
   CREDENTIAL_HEADER,
+  extractIdentityArtifact,
   extractIdentityProof,
   extractCredential,
   hasRole,

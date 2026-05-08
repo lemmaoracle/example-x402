@@ -12,9 +12,11 @@ import {
   isRevoked,
   KycGates,
   extractCredential,
+  extractIdentityArtifact,
   type KycVerificationResult,
 } from "./verify.js";
 import type { AgentCredential } from "@lemmaoracle/agent";
+import type { IdentityArtifact } from "@trust402/protocol";
 
 // ---------------------------------------------------------------------------
 // Test fixtures
@@ -41,6 +43,62 @@ const createCredential = (
     issuerId: "issuer-001",
     sourceSystem: "trust402-kyc",
   },
+  ...overrides,
+});
+
+const createIdentityArtifact = (
+  credential: AgentCredential = createCredential(),
+  overrides: Partial<IdentityArtifact> = {},
+): IdentityArtifact => ({
+  commitOutput: {
+    root: "1234567890123456789012345678901234567890123456789012345678901234",
+    salt: "0".repeat(64),
+    sectionHashes: {
+      identityHash: "a".repeat(64),
+      authorityHash: "b".repeat(64),
+      financialHash: "c".repeat(64),
+      lifecycleHash: "d".repeat(64),
+      provenanceHash: "e".repeat(64),
+    },
+    normalized: {
+      schema: "agent-identity-authority-v1",
+      identity: {
+        agentId: credential.identity.agentId,
+        subjectId: credential.identity.subjectId,
+        controllerId: credential.identity.controllerId ?? "",
+        orgId: credential.identity.orgId ?? "",
+      },
+      authority: {
+        roles: credential.authority.roles.map((r) => r.name).join(","),
+        scopes: credential.authority.scopes.map((s) => s.name).join(","),
+        permissions: credential.authority.permissions.map((p) => `${p.resource}:${p.action}`).join(","),
+      },
+      financial: {
+        spendLimit: "1000",
+        currency: "USDC",
+        paymentPolicy: "",
+      },
+      lifecycle: {
+        issuedAt: String(credential.lifecycle.issuedAt),
+        expiresAt: String(credential.lifecycle.expiresAt ?? 0),
+        revoked: "false",
+        revocationRef: "",
+      },
+      provenance: {
+        issuerId: credential.provenance.issuerId,
+        sourceSystem: credential.provenance.sourceSystem ?? "",
+        generatorId: credential.provenance.generatorId ?? "",
+        chainId: "84532",
+        network: "base-sepolia",
+      },
+    },
+  },
+  identityProof: {
+    proof: "test-proof",
+    inputs: ["input1", "input2"],
+  },
+  docHash: "test-doc-hash",
+  credential,
   ...overrides,
 });
 
@@ -296,7 +354,7 @@ describe("KYC Verification", () => {
     it("should support requireAll: false for any-one semantics", () => {
       const cred = createCredential({
         authority: {
-          roles: [{ name: "aml-cleared" }], // Has one of three required roles
+          roles: [{ name: "aml-cleared" }],
           scopes: [],
           permissions: [],
         },
@@ -332,8 +390,53 @@ describe("KYC Verification", () => {
     });
   });
 
+  describe("extractIdentityArtifact", () => {
+    it("should extract valid IdentityArtifact from X-PAYMENT-IDENTITY header", () => {
+      const credential = createCredential();
+      const artifact = createIdentityArtifact(credential);
+      const encoded = btoa(JSON.stringify(artifact));
+      const headers = { "X-PAYMENT-IDENTITY": encoded };
+
+      const result = extractIdentityArtifact(headers);
+
+      expect(result).not.toBeNull();
+      expect(result?.docHash).toBe("test-doc-hash");
+      expect(result?.credential.identity.agentId).toBe("agent-001");
+    });
+
+    it("should return null for missing header", () => {
+      const headers = {};
+      const result = extractIdentityArtifact(headers);
+      expect(result).toBeNull();
+    });
+
+    it("should return null for invalid base64", () => {
+      const headers = { "X-PAYMENT-IDENTITY": "not-valid-base64!!!" };
+      const result = extractIdentityArtifact(headers);
+      expect(result).toBeNull();
+    });
+
+    it("should return null for invalid JSON", () => {
+      const headers = { "X-PAYMENT-IDENTITY": btoa("not json") };
+      const result = extractIdentityArtifact(headers);
+      expect(result).toBeNull();
+    });
+  });
+
   describe("extractCredential", () => {
-    it("should extract valid credential from headers", () => {
+    it("should extract credential from X-PAYMENT-IDENTITY header", () => {
+      const credential = createCredential();
+      const artifact = createIdentityArtifact(credential);
+      const encoded = btoa(JSON.stringify(artifact));
+      const headers = { "X-PAYMENT-IDENTITY": encoded };
+
+      const result = extractCredential(headers);
+
+      expect(result).not.toBeNull();
+      expect(result?.identity.agentId).toBe("agent-001");
+    });
+
+    it("should fallback to X-Lemma-Credential header for backward compatibility", () => {
       const cred = createCredential();
       const encoded = btoa(JSON.stringify(cred));
       const headers = { "X-Lemma-Credential": encoded };
@@ -344,8 +447,28 @@ describe("KYC Verification", () => {
       expect(result?.identity.agentId).toBe("agent-001");
     });
 
-    it("should return null for missing header", () => {
-      const headers = {};
+    it("should prefer X-PAYMENT-IDENTITY over X-Lemma-Credential", () => {
+      const cred1 = createCredential({
+        identity: { agentId: "agent-001", subjectId: "subject-001" },
+      });
+      const cred2 = createCredential({
+        identity: { agentId: "agent-002", subjectId: "subject-002" },
+      });
+
+      const artifact = createIdentityArtifact(cred1);
+      const headers = {
+        "X-PAYMENT-IDENTITY": btoa(JSON.stringify(artifact)),
+        "X-Lemma-Credential": btoa(JSON.stringify(cred2)),
+      };
+
+      const result = extractCredential(headers);
+
+      // Should use X-PAYMENT-IDENTITY
+      expect(result?.identity.agentId).toBe("agent-001");
+    });
+
+    it("should return null for missing headers", () => {
+      const headers: Record<string, string | undefined> = {};
       const result = extractCredential(headers);
       expect(result).toBeNull();
     });

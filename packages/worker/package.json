@@ -15,6 +15,8 @@
     "@lemmaoracle/sdk": "^0.0.21",
     "@lemmaoracle/spec": "^0.0.21",
     "@lemmaoracle/x402": "^0.1.6",
+    "@trust402/identity": "workspace:*",
+    "@trust402/protocol": "workspace:*",
     "hono": "^4.12.15",
     "ramda": "^0.30.0"
   },

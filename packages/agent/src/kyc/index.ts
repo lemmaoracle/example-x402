@@ -29,5 +29,8 @@ export {
   type BuildArtifactResult,
 } from "./artifact.js";
 
-// Re-export IdentityArtifact type from mocks
-export type { IdentityArtifact } from "../mocks/protocol.js";
+// Re-export IdentityArtifact type from @trust402/protocol
+export type { IdentityArtifact } from "@trust402/protocol";
+
+// Re-export LemmaClient for convenience
+export type { LemmaClient } from "@lemmaoracle/sdk";

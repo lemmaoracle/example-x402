@@ -2,14 +2,23 @@
  * KYC Identity Artifact creation utilities.
  *
  * Builds IdentityArtifact from AgentCredential with KYC roles/scopes/permissions.
+ * Uses real @trust402/identity package for proof generation.
  */
 
 import * as R from "ramda";
 import type { AgentCredential } from "@lemmaoracle/agent";
-import { commit, prove } from "../mocks/identity.js";
-import type { CommitOutput, ProveOutput } from "../mocks/identity.js";
-import type { IdentityArtifact } from "../mocks/protocol.js";
+import {
+  register,
+  prove,
+  type RegisterOutput,
+  type CommitOutput,
+} from "@trust402/identity";
+import type { ProveOutput } from "@lemmaoracle/sdk";
+import type { IdentityArtifact } from "@trust402/protocol";
 import type { KycCredential, KycRole, KycScope, KycPermission } from "./types.js";
+
+// Import LemmaClient type for function signatures
+import type { LemmaClient } from "@lemmaoracle/sdk";
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -112,7 +121,6 @@ export type BuildArtifactInput = Readonly<{
   mac: string;
   issuerPublicKey: string;
   holderKey: string;
-  docHash?: string;
 }>;
 
 /**
@@ -120,29 +128,31 @@ export type BuildArtifactInput = Readonly<{
  */
 export type BuildArtifactResult = Readonly<{
   artifact: IdentityArtifact;
-  commitOutput: CommitOutput;
+  registerOutput: RegisterOutput;
   proveOutput: ProveOutput;
-  docHash: string;
 }>;
 
 /**
  * Build an IdentityArtifact from a credential.
  *
  * This performs:
- * 1. commit() - Creates the commitment structure
- * 2. prove() - Generates the ZK proof
+ * 1. register() - Creates the commitment structure and encrypts the credential
+ * 2. prove() - Generates the ZK identity proof
  * 3. Returns the IdentityArtifact
  */
 export const buildIdentityArtifact = async (
-  lemmaClient: Parameters<typeof commit>[0],
+  lemmaClient: LemmaClient,
   input: BuildArtifactInput,
 ): Promise<BuildArtifactResult> => {
-  // Step 1: Commit the credential
-  const commitOutput = await commit(lemmaClient, input.credential);
+  // Step 1: Register the credential (commit + encrypt)
+  const registerOutput = await register(lemmaClient, {
+    credential: input.credential,
+    holderKey: input.holderKey,
+  });
 
   // Step 2: Generate the identity proof
   const proveOutput = await prove(lemmaClient, {
-    commitOutput,
+    commitOutput: registerOutput.commitOutput,
     issuerSecretKey: input.issuerSecretKey,
     mac: input.mac,
     issuerPublicKey: input.issuerPublicKey,
@@ -150,26 +160,25 @@ export const buildIdentityArtifact = async (
     nowSec: Math.floor(Date.now() / 1000).toString(),
   });
 
-  // Use provided docHash or compute from credential
-  const docHash = input.docHash ?? commitOutput.root;
-
   // Step 3: Build the IdentityArtifact
   const artifact: IdentityArtifact = {
-    commitOutput,
+    commitOutput: registerOutput.commitOutput,
     identityProof: proveOutput,
-    docHash,
+    docHash: registerOutput.docHash,
     credential: input.credential,
   };
 
   return {
     artifact,
-    commitOutput,
+    registerOutput,
     proveOutput,
-    docHash,
   };
 };
 
 // ── Re-exports for convenience ────────────────────────────────────────────
 
-// Re-export IdentityArtifact type from mocks
-export type { IdentityArtifact } from "../mocks/protocol.js";
+// Re-export IdentityArtifact type from @trust402/protocol
+export type { IdentityArtifact } from "@trust402/protocol";
+
+// Re-export LemmaClient type for convenience
+export type { LemmaClient } from "@lemmaoracle/sdk";

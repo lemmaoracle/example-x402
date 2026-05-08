@@ -2,13 +2,16 @@
  * KYC verification utilities for worker-side enforcement.
  *
  * Verifies identity proofs from x402 payment headers and checks KYC attributes.
+ * Reads from X-PAYMENT-IDENTITY header (Base64-encoded JSON IdentityArtifact).
  */
 
 import * as R from "ramda";
+import type { AgentCredential } from "@lemmaoracle/agent";
+import type { IdentityArtifact } from "@trust402/protocol";
 
 // ── Types (defined locally to avoid cross-package imports) ─────────────────────
 
-type KycVerificationResult = Readonly<{
+export type KycVerificationResult = Readonly<{
   verified: boolean;
   agentId?: string;
   roles: ReadonlyArray<string>;
@@ -18,58 +21,96 @@ type KycVerificationResult = Readonly<{
   reason?: string;
 }>;
 
-type KycGateConfig = Readonly<{
+export type KycGateConfig = Readonly<{
   requiredRoles?: ReadonlyArray<string>;
   requiredScopes?: ReadonlyArray<string>;
   requiredPermissions?: ReadonlyArray<{ resource: string; action: string }>;
   requireAll?: boolean;
 }>;
 
-// Import AgentCredential type
-import type { AgentCredential } from "@lemmaoracle/agent";
-
-// Re-export types
-export type { KycVerificationResult, KycGateConfig };
-
-// ── Proof Header Extraction ───────────────────────────────────────────────
+// ── Constants ─────────────────────────────────────────────────────────────
 
 /**
- * Header name for identity proof in x402 payment.
+ * Header name for identity artifact in x402 payment.
+ * Contains Base64-encoded JSON IdentityArtifact.
+ */
+export const IDENTITY_ARTIFACT_HEADER = "X-PAYMENT-IDENTITY";
+
+/**
+ * Legacy header names (for backward compatibility).
  */
 export const IDENTITY_PROOF_HEADER = "X-Lemma-Identity-Proof";
-
-/**
- * Header name for credential in x402 payment.
- */
 export const CREDENTIAL_HEADER = "X-Lemma-Credential";
 
+// ── Header Extraction ───────────────────────────────────────────────────────
+
 /**
- * Extract identity proof from payment headers.
+ * Extract IdentityArtifact from X-PAYMENT-IDENTITY header.
+ *
+ * The header contains Base64-encoded JSON with structure:
+ * {
+ *   commitOutput: { ... },
+ *   identityProof: { proof: string, inputs: string[] },
+ *   docHash: string,
+ *   credential: AgentCredential
+ * }
  */
-export const extractIdentityProof = (
+export const extractIdentityArtifact = (
   headers: Record<string, string | undefined>,
-): Readonly<Record<string, unknown>> | null => {
-  const proofHeader = headers[IDENTITY_PROOF_HEADER];
-  if (!proofHeader) return null;
+): IdentityArtifact | null => {
+  const artifactHeader = headers[IDENTITY_ARTIFACT_HEADER];
+  if (!artifactHeader) return null;
 
   try {
-    return JSON.parse(atob(proofHeader)) as Record<string, unknown>;
+    return JSON.parse(atob(artifactHeader)) as IdentityArtifact;
   } catch {
     return null;
   }
 };
 
 /**
- * Extract credential from payment headers.
+ * Extract credential from X-PAYMENT-IDENTITY header.
+ * This is the primary method for KYC verification.
  */
 export const extractCredential = (
   headers: Record<string, string | undefined>,
 ): AgentCredential | null => {
+  // Primary path: extract from X-PAYMENT-IDENTITY header
+  const artifact = extractIdentityArtifact(headers);
+  if (artifact) {
+    return artifact.credential;
+  }
+
+  // Fallback: legacy X-Lemma-Credential header (for backward compatibility)
   const credHeader = headers[CREDENTIAL_HEADER];
   if (!credHeader) return null;
 
   try {
     return JSON.parse(atob(credHeader)) as AgentCredential;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Extract identity proof from payment headers.
+ * Returns the identityProof from the IdentityArtifact.
+ */
+export const extractIdentityProof = (
+  headers: Record<string, string | undefined>,
+): Readonly<Record<string, unknown>> | null => {
+  // Primary path: extract from X-PAYMENT-IDENTITY header
+  const artifact = extractIdentityArtifact(headers);
+  if (artifact) {
+    return artifact.identityProof as unknown as Record<string, unknown>;
+  }
+
+  // Fallback: legacy X-Lemma-Identity-Proof header
+  const proofHeader = headers[IDENTITY_PROOF_HEADER];
+  if (!proofHeader) return null;
+
+  try {
+    return JSON.parse(atob(proofHeader)) as Record<string, unknown>;
   } catch {
     return null;
   }
