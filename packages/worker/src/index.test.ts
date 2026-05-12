@@ -1,11 +1,12 @@
 /**
- * Worker tests — 402 response shape verification.
- *
- * Tests that x402 payment-required responses have the correct structure.
+ * Worker tests — 402 response shape verification and secret-redaction
+ * regression guard.
  */
 
 import { describe, it, expect } from "vitest";
 import { Hono } from "hono";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 // ---------------------------------------------------------------------------
 // Types (mirrored from index.ts for testing)
@@ -165,6 +166,23 @@ describe("Worker", () => {
 
       expect(mockResponse.accepts[0].extra.name).toBe("USDC");
       expect(mockResponse.accepts[0].extra.version).toBe("2");
+    });
+  });
+
+  describe("wrangler.toml secret redaction", () => {
+    // Regression guard: a previous revision committed LEMMA_API_KEY as a
+    // literal value under [vars] in packages/worker/wrangler.toml. Secrets
+    // must live in `wrangler secret put` (production) or .dev.vars (local).
+    // If this test fails, someone re-introduced a literal key — move it back
+    // to a secret and refresh the test fixture.
+    it("does not contain a literal LEMMA_API_KEY in vars", () => {
+      const wranglerToml = readFileSync(
+        join(__dirname, "..", "wrangler.toml"),
+        "utf-8",
+      );
+      // Match `LEMMA_API_KEY` followed by `=` and any non-comment value.
+      const literalAssignment = /^\s*LEMMA_API_KEY\s*=/m;
+      expect(wranglerToml).not.toMatch(literalAssignment);
     });
   });
 

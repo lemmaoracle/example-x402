@@ -81,15 +81,17 @@ pnpm install
 cp .env.example .env
 # Required: PAY_TO_ADDRESS, AGENT_PRIVATE_KEY
 
-# Worker CDP credentials (for x402 facilitator auth)
-# Get keys from https://portal.cdp.coinbase.com/
+# Worker secrets (kept out of git via `.dev.vars`)
+# - CDP keys for x402 facilitator auth: https://portal.cdp.coinbase.com/
+# - LEMMA_API_KEY: optional for demo; required for higher rate limits
 cat > packages/worker/.dev.vars << 'EOF'
 CDP_API_KEY_ID=your_key_id
 CDP_API_KEY_SECRET=your_key_secret
+LEMMA_API_KEY=your_lemma_api_key
 EOF
 ```
 
-> The worker's `wrangler.toml` includes a demo `LEMMA_API_KEY` and `FACILITATOR_URL` pre-configured for Base Sepolia — no extra setup needed.
+> The worker's `wrangler.toml` ships `LEMMA_API_BASE` and `FACILITATOR_URL` for Base Sepolia. `LEMMA_API_KEY` is treated as a secret and is not committed — set it as a Cloudflare Workers secret for deployments (`npx wrangler secret put LEMMA_API_KEY --cwd packages/worker`) and via `packages/worker/.dev.vars` for local dev.
 
 ### 2. Start the worker
 
