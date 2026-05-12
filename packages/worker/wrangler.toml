@@ -11,6 +11,7 @@ LEMMA_API_BASE = "https://workers.lemma.workers.dev"
 # LEMMA_API_KEY is set as an encrypted Cloudflare Workers secret, not in vars.
 #   wrangler secret put LEMMA_API_KEY --cwd packages/worker
 # For local dev, put it in packages/worker/.dev.vars (gitignored).
+# The demo path works without a key, but is rate-limited.
 FACILITATOR_URL = "https://api.cdp.coinbase.com/platform/v2/x402"
 LEMMA_RELAY_URL = "https://p01--lemma-relay-api--svxwx5rc5jzx.code.run/"
 PAY_TO_ADDRESS = "0x000000000000000000000000000000000000dEaD"
