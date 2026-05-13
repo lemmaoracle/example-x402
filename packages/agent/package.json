@@ -6,6 +6,9 @@
   "type": "module",
   "scripts": {
     "start": "tsx src/index.ts",
+    "layer3": "tsx src/layer3-demo.ts",
+    "layer3:disclosure": "tsx src/layer3-demo.ts -- --with-disclosure",
+    "layer3:aml": "tsx src/layer3-demo.ts -- --gate amlCompliance",
     "test": "vitest run"
   },
   "dependencies": {
