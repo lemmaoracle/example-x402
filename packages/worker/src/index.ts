@@ -158,7 +158,6 @@ const staticRoutes = {
     ],
     description: "Verified provenance attributes for a Lemma-attested document",
     mimeType: "application/json",
-    discoverable: true,
     extensions: { lemma: {} },
   },
   "POST /example/query": {
@@ -176,7 +175,6 @@ const staticRoutes = {
     ],
     description: "ZK-verified blog articles with BBS+ selective disclosure",
     mimeType: "application/json",
-    discoverable: true,
     extensions: { lemma: {} },
   },
 };
