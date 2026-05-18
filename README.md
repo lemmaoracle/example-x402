@@ -24,7 +24,7 @@ Agents can already move money. What they can't do is prove anything about themse
 | "Trust me" self-report | On-chain verifiable attributes |
 | No provenance on received data | Cryptographic integrity binding per response |
 
-One middleware call turns every x402 payment into a verifiable trust event.
+One middleware call. Every x402 payment becomes a verifiable trust event.
 
 ---
 
