@@ -84,12 +84,13 @@ cp .env.example .env
 # Worker CDP credentials (for x402 facilitator auth)
 # Get keys from https://portal.cdp.coinbase.com/
 cat > packages/worker/.dev.vars << 'EOF'
-CDP_API_KEY_ID=your_key_id
-CDP_API_KEY_SECRET=your_key_secret
+CDP_API_KEY_ID=***
+CDP_API_KEY_SECRET=***
+LEMMA_API_KEY=your-api-key
 EOF
 ```
 
-> The worker's `wrangler.toml` includes a demo `LEMMA_API_KEY` and `FACILITATOR_URL` pre-configured for Base Sepolia — no extra setup needed.
+> **Getting a Lemma API key:** Sign up at [lemma.frame00.com/services](https://lemma.frame00.com/services) and generate an API key. The key is free during the beta period. Set it as `LEMMA_API_KEY` in `.dev.vars` (local dev) or via `npx wrangler secret put LEMMA_API_KEY` (production).
 
 ### 2. Start the worker
 

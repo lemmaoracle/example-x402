@@ -203,6 +203,15 @@ app.use("*", async (c, next) => {
     return next();
   }
 
+  if (!c.env.LEMMA_API_KEY) {
+    const msg =
+      "LEMMA_API_KEY is not set. " +
+      "For local dev, add it to packages/worker/.dev.vars. " +
+      "For production, run: npx wrangler secret put LEMMA_API_KEY";
+    console.error(`FATAL: ${msg}`);
+    return c.json({ error: msg }, 500);
+  }
+
   try {
     // Use @coinbase/x402 for automatic CDP facilitator authentication.
     // Reads CDP_API_KEY_ID and CDP_API_KEY_SECRET from env vars.
