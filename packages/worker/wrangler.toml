@@ -2,14 +2,16 @@ name = "lemma-query"
 main = "src/index.ts"
 compatibility_date = "2024-12-30"
 compatibility_flags = ["nodejs_compat"]
+workers_dev = true
 
 [dev]
 port = 8787
 
+# LEMMA_API_KEY is set via `wrangler secret put LEMMA_API_KEY`.
+# For local dev, create packages/worker/.dev.vars with:
+#   LEMMA_API_KEY="<your-key>"
 [vars]
 LEMMA_API_BASE = "https://workers.lemma.workers.dev"
-# Demo-only API key — safe to commit (read-only, scoped to demo data)
-LEMMA_API_KEY = "b6363aa6265322ed0d786a11d5b6d3264947052ca72deba4cbe1685d099af892"
 FACILITATOR_URL = "https://api.cdp.coinbase.com/platform/v2/x402"
 LEMMA_RELAY_URL = "https://p01--lemma-relay-api--svxwx5rc5jzx.code.run/"
 PAY_TO_ADDRESS = "0x000000000000000000000000000000000000dEaD"
