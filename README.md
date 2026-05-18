@@ -90,7 +90,7 @@ LEMMA_API_KEY=your-api-key
 EOF
 ```
 
-> **Getting a Lemma API key:** Sign up at [lemma.frame00.com/services](https://lemma.frame00.com/services) and generate an API key. The key is free during the beta period. Set it as `LEMMA_API_KEY` in `.dev.vars` (local dev) or via `npx wrangler secret put LEMMA_API_KEY` (production).
+> **Getting a Lemma API key:** Issue a free API key at [dashboard.lemma.workers.dev](https://dashboard.lemma.workers.dev/), then set it as `LEMMA_API_KEY` in `.dev.vars` (local dev) or via `npx wrangler secret put LEMMA_API_KEY` (production).
 
 ### 2. Start the worker
 
