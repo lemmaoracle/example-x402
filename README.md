@@ -18,11 +18,11 @@ This repo is a reference implementation: an HTTP 402 flow where every micropayme
 
 Agents can already move money. What they can't do is prove anything about themselves or the data they receive:
 
-| Without Lemma | With Lemma |
+| What x402 settles | What Lemma proves |
 | :--- | :--- |
-| Anonymous transfer | ZK-proven agent ID (issuer + role + policy) |
-| "Trust me" self-report | On-chain verifiable attributes |
-| No provenance on received data | Cryptographic integrity binding per response |
+| A payment cleared | *Which* agent paid — issuer, role, policy, as a ZK proof |
+| Funds reached the resource | The data behind the response is authentic and untampered |
+| The transfer is final | Only the agreed attributes are revealed — BBS+ selective disclosure |
 
 One middleware call. Every x402 payment becomes a verifiable trust event.
 
